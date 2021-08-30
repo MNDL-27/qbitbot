@@ -13,16 +13,17 @@ impl QDownloadAction {
     }
 
     pub async fn send_link(mut self, client: &QbClient, link: &str) -> Result<Self> {
-        client
+        let resp = client
             .qsend(
                 "/command/download",
                 QDownload {
                     urls: link.to_string(),
                 },
             )
-            .await.unwrap();
-        // TODO: process successful torrent addition
-        self.status = true;
+            .await?;
+        // No matter if successful or not server will return the 200 code
+        // TODO: process successful addition
+        self.status = resp.status().is_success();
         Ok(self)
     }
 }
