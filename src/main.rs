@@ -14,7 +14,7 @@ async fn main() -> Result<()> {
             tokio::spawn(
                 async move {
                     let resp = reply.send().await;
-                    println!("{:#?}", resp)
+                    // println!("{:#?}", resp)
                 }
             );
         }

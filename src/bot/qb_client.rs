@@ -6,14 +6,17 @@ use reqwest::{
     Client, Response,
 };
 use serde::Serialize;
+use serde_json::Value;
 
-use crate::bot::commands::QbList;
-
-use super::{
-    commands::{gen_help, Login},
-    config::QbConfig,
+use crate::bot::commands::{
+    cmd_list::{QHelp, UnknownCommand},
+    qlist::QListAction,
+    QbCommandAction,
 };
 
+use super::{commands::cmd_list::Login, config::QbConfig, qbot::RbotParseMode};
+
+#[derive(Debug)]
 pub struct QbClient {
     pub config: QbConfig,
     client: Client,
@@ -67,6 +70,10 @@ impl QbClient {
         }
     }
 
+    pub async fn qsend_json<T: Serialize>(&self, location: &str, action: T) -> Result<Value> {
+        Ok(self.qsend(location, action).await?.json().await?)
+    }
+
     pub async fn login(&self) -> Result<()> {
         let login = Login {
             username: self.config.user.clone(),
@@ -76,11 +83,23 @@ impl QbClient {
         Ok(())
     }
 
-    pub async fn do_cmd(&self, text: &str) -> Result<String> {
-        match text {
-            "/help" => Ok(gen_help()),
-            "/list" => QbList::get(&self, "").await,
-            _ => Ok("Unknown command".to_string()),
-        }
+    pub async fn do_cmd(&self, text: &str) -> Result<(String, RbotParseMode)> {
+        let cmd_result: Box<dyn QbCommandAction> = match text {
+            "/help" => Box::new(QHelp {}),
+            "/list" => Box::new(QListAction::new().get(&self, "").await?),
+            _ => Box::new(UnknownCommand {}),
+        };
+
+        let prepared = match cmd_result.parse_mode() {
+            Some(rutebot::requests::ParseMode::Html) => {
+                format!("<pre>{}</pre>", cmd_result.convert_to_string())
+            }
+            _ => cmd_result.convert_to_string(),
+        };
+        
+        // Telegram message size is limited by 4096 characters
+        let cut_msg: String = prepared.chars().take(4096).collect();
+
+        Ok((cut_msg, cmd_result.parse_mode()))
     }
 }

@@ -1,10 +1,12 @@
 use rutebot::{
     client::{ApiRequest, Rutebot},
-    requests::SendMessage,
+    requests::{ParseMode, SendMessage},
     responses::{Message, Update, User},
 };
 
 use super::qb_client::QbClient;
+
+pub type RbotParseMode = Option<ParseMode>;
 
 pub struct QbitBot {
     pub rbot: Rutebot,
@@ -22,12 +24,16 @@ impl QbitBot {
     pub async fn proccess_message(&self, update: Update) -> Option<ApiRequest<Message>> {
         let message = update.message?;
         let user = message.from?;
-        let response_message = if self.check_is_admin(&user) {
+        let (response_message, parse_mode) = if self.check_is_admin(&user) {
             self.qbclient.do_cmd(&message.text?).await.ok()?
         } else {
-            "You are not allowed to chat with me".to_string()
+            ("You are not allowed to chat with me".to_string(), None)
         };
-        let reply = SendMessage::new(message.chat.id, &response_message);
+        let reply = SendMessage {
+            parse_mode,
+            ..SendMessage::new(message.chat.id, &response_message)
+        };
+        println!("{:#?}", response_message);
         Some(self.rbot.prepare_api_request(reply))
     }
 
