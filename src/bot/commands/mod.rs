@@ -2,6 +2,7 @@ use super::qbot::RbotParseMode;
 
 pub mod cmd_list;
 pub mod qlist;
+pub mod simple;
 
 pub trait QbCommandAction {
     /// Command name as it should be written in Telegram chat

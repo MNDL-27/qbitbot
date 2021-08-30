@@ -8,13 +8,16 @@ use reqwest::{
 use serde::Serialize;
 use serde_json::Value;
 
-use crate::bot::commands::{
-    cmd_list::{QHelp, UnknownCommand},
-    qlist::QListAction,
-    QbCommandAction,
-};
+use crate::bot::commands::{qlist::QListAction, QbCommandAction};
 
-use super::{commands::cmd_list::Login, config::QbConfig, qbot::RbotParseMode};
+use super::{
+    commands::{
+        cmd_list::Login,
+        simple::{QHelp, QStart, UnknownCommand},
+    },
+    config::QbConfig,
+    qbot::RbotParseMode,
+};
 
 #[derive(Debug)]
 pub struct QbClient {
@@ -86,17 +89,19 @@ impl QbClient {
     pub async fn do_cmd(&self, text: &str) -> Result<(String, RbotParseMode)> {
         let cmd_result: Box<dyn QbCommandAction> = match text {
             "/help" => Box::new(QHelp {}),
+            "/start" => Box::new(QStart {}),
             "/list" => Box::new(QListAction::new().get(&self, "").await?),
             _ => Box::new(UnknownCommand {}),
         };
 
+        // TODO: escape HTML and Markdown special chars
         let prepared = match cmd_result.parse_mode() {
             Some(rutebot::requests::ParseMode::Html) => {
                 format!("<pre>{}</pre>", cmd_result.convert_to_string())
             }
             _ => cmd_result.convert_to_string(),
         };
-        
+
         // Telegram message size is limited by 4096 characters
         let cut_msg: String = prepared.chars().take(4096).collect();
 
