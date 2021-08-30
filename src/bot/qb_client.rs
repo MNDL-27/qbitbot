@@ -13,6 +13,7 @@ use crate::bot::commands::{qlist::QListAction, QbCommandAction};
 use super::{
     commands::{
         cmd_list::Login,
+        qdownload::QDownloadAction,
         simple::{QHelp, QStart, UnknownCommand},
     },
     config::QbConfig,
@@ -64,6 +65,7 @@ impl QbClient {
             .with_context(|| "Failed to send request")?;
 
         if resp.status().is_success() {
+            println!("{:#?}", resp);
             Ok(resp)
         } else {
             Err(anyhow!(format!(
@@ -73,7 +75,11 @@ impl QbClient {
         }
     }
 
-    pub async fn qsend_json<T: Serialize>(&self, location: &str, action: T) -> Result<Value> {
+    pub async fn qsend_json_response<T: Serialize>(
+        &self,
+        location: &str,
+        action: T,
+    ) -> Result<Value> {
         Ok(self.qsend(location, action).await?.json().await?)
     }
 
@@ -82,24 +88,26 @@ impl QbClient {
             username: self.config.user.clone(),
             password: self.config.password.clone(),
         };
-        self.qsend("login", login).await?;
+        self.qsend("/login", login).await?;
         Ok(())
     }
 
     pub async fn do_cmd(&self, text: &str) -> Result<(String, RbotParseMode)> {
-        let cmd_result: Box<dyn QbCommandAction> = match text {
-            "/help" => Box::new(QHelp {}),
-            "/start" => Box::new(QStart {}),
-            "/list" => Box::new(QListAction::new().get(&self, "").await?),
+        let tokens = text.split(' ').collect::<Vec<_>>();
+        let cmd_result: Box<dyn QbCommandAction> = match tokens.as_slice() {
+            ["/help"] => Box::new(QHelp {}),
+            ["/start"] => Box::new(QStart {}),
+            ["/list"] => Box::new(QListAction::new().get(&self, "").await?),
+            ["/download", link] => Box::new(QDownloadAction::new().send_link(&self, link).await?),
             _ => Box::new(UnknownCommand {}),
         };
 
         // TODO: escape HTML and Markdown special chars
         let prepared = match cmd_result.parse_mode() {
             Some(rutebot::requests::ParseMode::Html) => {
-                format!("<pre>{}</pre>", cmd_result.convert_to_string())
+                format!("<pre>{}</pre>", cmd_result.action_result_to_string())
             }
-            _ => cmd_result.convert_to_string(),
+            _ => cmd_result.action_result_to_string(),
         };
 
         // Telegram message size is limited by 4096 characters

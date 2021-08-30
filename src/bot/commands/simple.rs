@@ -11,7 +11,7 @@ impl QbCommandAction for QHelp {
         "/help".to_string()
     }
 
-    fn convert_to_string(&self) -> String {
+    fn action_result_to_string(&self) -> String {
         "Help is here".to_string()
     }
 }
@@ -23,7 +23,7 @@ impl QbCommandAction for UnknownCommand {
         todo!()
     }
 
-    fn convert_to_string(&self) -> String {
+    fn action_result_to_string(&self) -> String {
         "Unknown command".to_string()
     }
 }
@@ -35,7 +35,7 @@ impl QbCommandAction for QStart {
         "/start".to_string()
     }
 
-    fn convert_to_string(&self) -> String {
+    fn action_result_to_string(&self) -> String {
         r#"
 Hello! It's Qbittorrent Telegram bot. 
 See the commands list using [/help](/help)."#

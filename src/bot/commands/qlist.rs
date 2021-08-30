@@ -1,4 +1,4 @@
-use std::time::{Duration, UNIX_EPOCH};
+use std::time::{Duration, SystemTime};
 
 use chrono::{DateTime, Local};
 use rutebot::requests::ParseMode;
@@ -35,16 +35,18 @@ impl QListAction {
         let humanized_eta = if eta == 8640000 {
             "done".to_string()
         } else {
-            let secs = UNIX_EPOCH + Duration::from_secs(eta);
-            DateTime::<Local>::from(secs).format("%Y-%m-%d %H:%M:%S").to_string()
+            let secs = SystemTime::now() + Duration::from_secs(eta);
+            DateTime::<Local>::from(secs)
+                .format("%Y-%m-%d %H:%M:%S")
+                .to_string()
         };
         Some(humanized_eta)
     }
 
     pub async fn get(mut self, client: &QbClient, filter: &str) -> Result<Self> {
         let resp = client
-            .qsend_json(
-                "query/torrents",
+            .qsend_json_response(
+                "/query/torrents",
                 QbList {
                     filter: filter.to_string(),
                 },
@@ -55,11 +57,12 @@ impl QListAction {
                 .as_array()?
                 .iter()
                 .filter_map(|item| {
+                    let progress = item.get("progress").unwrap().as_f64()? * 100.0;
                     Some(format!(
                         "{name:20} | {size:6} Mb | {progress:3}% | {eta:19}\n",
                         name = Self::get_name(item)?,
                         size = item.get("size")?.as_u64()? / 1048576,
-                        progress = item.get("progress")?.as_u64()? * 100,
+                        progress = progress as u64,
                         eta = Self::get_eta(item)?
                     ))
                 })
@@ -83,7 +86,7 @@ impl QbCommandAction for QListAction {
         Some(ParseMode::Html)
     }
 
-    fn convert_to_string(&self) -> String {
+    fn action_result_to_string(&self) -> String {
         self.content
             .clone()
             .map_or("Failed to get Qbittorrent response".to_string(), |x| x)
