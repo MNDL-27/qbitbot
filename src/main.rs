@@ -10,14 +10,8 @@ async fn main() -> Result<()> {
     println!("QbitBot launched");
     let mut updates_stream = Box::pin(qbot.rbot.incoming_updates(None, None));
     while let Some(update) = updates_stream.next().await.transpose()? {
-        if let Some(reply) = qbot.proccess_message(update).await {
-            tokio::spawn(
-                async move {
-                    let resp = reply.send().await;
-                    // println!("{:#?}", resp)
-                }
-            );
-        }
+        let res = qbot.proccess_message(update).await;
+        println!("{:#?}", res)
     }
     Ok(())
 }
