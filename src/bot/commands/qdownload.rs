@@ -1,29 +1,68 @@
+use std::collections::HashSet;
+
 use crate::bot::qb_client::QbClient;
 use anyhow::Result;
+use reqwest::Response;
 
-use super::{cmd_list::QDownload, QbCommandAction};
+use super::{cmd_list::QDownload, qlist::QListAction, QbCommandAction};
 
 pub struct QDownloadAction {
     status: bool,
+    validate: bool,
 }
 
 impl QDownloadAction {
-    pub fn new() -> Self {
-        QDownloadAction { status: false }
+    pub fn new(validate: bool) -> Self {
+        QDownloadAction {
+            status: false,
+            validate,
+        }
     }
 
-    pub async fn send_link(mut self, client: &QbClient, link: &str) -> Result<Self> {
+    async fn check_added(client: &QbClient, list_before: Option<HashSet<String>>) -> bool {
+        if let Some(hashes) = list_before {
+            let list_after = Self::get_hashes(client).await.unwrap_or_default();
+            let diff: HashSet<String> = list_after.difference(&hashes).cloned().collect();
+            diff.len() == 1
+        } else {
+            false
+        }
+    }
+
+    async fn inner_send(client: &QbClient, link: &str) -> Result<Response> {
         let resp = client
-            .qsend(
+            .qpost(
                 "/command/download",
                 QDownload {
                     urls: link.to_string(),
                 },
             )
             .await?;
-        // No matter if successful or not server will return the 200 code
-        // TODO: process successful addition
-        self.status = resp.status().is_success();
+        Ok(resp)
+    }
+
+    async fn get_hashes(client: &QbClient) -> Option<HashSet<String>> {
+        let hashes = QListAction::new()
+            .get_raw(client, "")
+            .await
+            .ok()?
+            .as_array()?
+            .iter()
+            .filter_map(|item| serde_json::from_value(item.get("hash").cloned()?).ok())
+            .collect();
+        Some(hashes)
+    }
+
+    pub async fn send_link(mut self, client: &QbClient, link: &str) -> Result<Self> {
+        if self.validate {
+            let list_before = Self::get_hashes(client).await;
+            let send_resp = Self::inner_send(client, link).await?;
+            self.status =
+                send_resp.status().is_success() && Self::check_added(client, list_before).await;
+        } else {
+            let send_resp = Self::inner_send(client, link).await?;
+            self.status = send_resp.status().is_success();
+        };
         Ok(self)
     }
 }

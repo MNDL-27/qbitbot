@@ -53,7 +53,7 @@ impl QbClient {
             .unwrap()
     }
 
-    pub async fn qsend<T: Serialize>(&self, location: &str, action: T) -> Result<Response> {
+    pub async fn qpost<T: Serialize>(&self, location: &str, action: T) -> Result<Response> {
         let mut api_loc = self.config.location.clone();
         api_loc.push_str(location);
         let resp = self
@@ -62,7 +62,7 @@ impl QbClient {
             .form(&action)
             .send()
             .await
-            .with_context(|| "Failed to send request")?;
+            .with_context(|| "Failed to send POST request")?;
 
         if resp.status().is_success() {
             println!("{:#?}", resp);
@@ -75,12 +75,33 @@ impl QbClient {
         }
     }
 
-    pub async fn qsend_json_response<T: Serialize>(
+    pub async fn qget(&self, location: &str) -> Result<Response> {
+        let mut api_loc = self.config.location.clone();
+        api_loc.push_str(location);
+        let resp = self
+            .client
+            .get(api_loc)
+            .send()
+            .await
+            .with_context(|| "Failed to send GET request")?;
+
+        if resp.status().is_success() {
+            println!("{:#?}", resp);
+            Ok(resp)
+        } else {
+            Err(anyhow!(format!(
+                "Command failed. Status code: {}",
+                resp.status()
+            )))
+        }
+    }
+
+    pub async fn qpost_json_response<T: Serialize>(
         &self,
         location: &str,
         action: T,
     ) -> Result<Value> {
-        Ok(self.qsend(location, action).await?.json().await?)
+        Ok(self.qpost(location, action).await?.json().await?)
     }
 
     pub async fn login(&self) -> Result<()> {
@@ -88,8 +109,14 @@ impl QbClient {
             username: self.config.user.clone(),
             password: self.config.password.clone(),
         };
-        self.qsend("/login", login).await?;
+        self.qpost("/login", login).await?;
         Ok(())
+    }
+
+    pub async fn get_properties(&self, hash: &str) -> Result<Value> {
+        let request_string = format!("/query/propertiesGeneral/{}", hash);
+        let value = self.qget(&request_string).await?.json().await?;
+        Ok(value)
     }
 
     pub async fn do_cmd(&self, text: &str) -> Result<(String, RbotParseMode)> {
@@ -98,7 +125,7 @@ impl QbClient {
             ["/help"] => Box::new(QHelp {}),
             ["/start"] => Box::new(QStart {}),
             ["/list"] => Box::new(QListAction::new().get(&self, "").await?),
-            ["/download", link] => Box::new(QDownloadAction::new().send_link(&self, link).await?),
+            ["/download", link] => Box::new(QDownloadAction::new(true).send_link(&self, link).await?),
             _ => Box::new(UnknownCommand {}),
         };
 
