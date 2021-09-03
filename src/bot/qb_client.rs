@@ -7,6 +7,7 @@ use reqwest::{
 };
 use serde::Serialize;
 use serde_json::Value;
+use tokio::sync::mpsc::Sender;
 
 use crate::bot::commands::{qlist::QListAction, QbCommandAction};
 
@@ -17,7 +18,7 @@ use super::{
         simple::{QHelp, QStart, UnknownCommand},
     },
     config::QbConfig,
-    qbot::RbotParseMode,
+    qbot::{MessageWrapper, RbotParseMode},
 };
 
 #[derive(Debug)]
@@ -119,13 +120,21 @@ impl QbClient {
         Ok(value)
     }
 
-    pub async fn do_cmd(&self, text: &str) -> Result<(String, RbotParseMode)> {
+    pub async fn do_cmd(
+        &self,
+        text: &str,
+        tg_tx: Sender<MessageWrapper>,
+    ) -> Result<(String, RbotParseMode)> {
         let tokens = text.split(' ').collect::<Vec<_>>();
         let cmd_result: Box<dyn QbCommandAction> = match tokens.as_slice() {
             ["/help"] => Box::new(QHelp {}),
             ["/start"] => Box::new(QStart {}),
             ["/list"] => Box::new(QListAction::new().get(&self, "").await?),
-            ["/download", link] => Box::new(QDownloadAction::new(true, true).send_link(&self, link).await?),
+            ["/download", link] => Box::new(
+                QDownloadAction::new(true, true, tg_tx)
+                    .send_link(&self, link)
+                    .await?,
+            ),
             _ => Box::new(UnknownCommand {}),
         };
 
