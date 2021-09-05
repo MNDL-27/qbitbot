@@ -1,0 +1,16 @@
+[Unit]
+Description=Qbittorrent Telegram bot
+After=network.target
+StartLimitIntervalSec=0
+[Service]
+Type=simple
+Restart=always
+RestartSec=5
+User=root
+WorkingDirectory=/root/qbitbot
+ExecStart=/usr/local/bin/qbitbot
+PIDFile=/var/run/qbitbot.pid
+TimeoutSec=10
+
+[Install]
+WantedBy=multi-user.target

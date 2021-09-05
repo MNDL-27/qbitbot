@@ -728,8 +728,6 @@ dependencies = [
  "chrono",
  "dotenv",
  "futures-util",
- "openssl",
- "openssl-sys",
  "reqwest",
  "rutebot",
  "serde",
