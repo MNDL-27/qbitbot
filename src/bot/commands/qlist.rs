@@ -43,23 +43,32 @@ impl QListAction {
         Some(humanized_eta)
     }
 
-    pub async fn get_raw(&self, client: &QbClient) -> Result<Value> {
+    pub async fn get(&self, client: &QbClient) -> Result<Value> {
         let resp = client
-            .qpost_json_response("/query/torrents", QbList {})
+            .qget(
+                "/query/torrents",
+                QbList {
+                    sort: "hash".to_string(),
+                },
+            )
+            .await?
+            .json()
             .await?;
         Ok(resp)
     }
 
-    pub async fn get(mut self, client: &QbClient) -> Result<Self> {
-        let resp = self.get_raw(client).await?;
+    pub async fn get_formatted(mut self, client: &QbClient) -> Result<Self> {
+        let resp = self.get(client).await?;
         self.content = move || -> Option<String> {
             let converted = resp
                 .as_array()?
                 .iter()
-                .filter_map(|item| {
+                .enumerate()
+                .filter_map(|(num, item)| {
                     let progress = item.get("progress").unwrap().as_f64()? * 100.0;
                     Some(format!(
-                        "{name:20} | {size:6} Mb | {progress:3}% | {eta:19}\n",
+                        "{num:2} | {name:20} | {size:6} Mb | {progress:3}% | {eta:19}\n",
+                        num = num,
                         name = Self::get_name(item)?,
                         size = item.get("size")?.as_u64()? / 1048576,
                         progress = progress as u64,

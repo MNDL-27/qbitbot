@@ -67,7 +67,7 @@ impl QDownloadAction {
 
     async fn get_hashes(client: &QbClient) -> Option<HashSet<String>> {
         let hashes = QListAction::new()
-            .get_raw(client)
+            .get(client)
             .await
             .ok()?
             .as_array()?
@@ -78,7 +78,7 @@ impl QDownloadAction {
     }
 
     async fn get_name(client: &QbClient, hash: &str) -> Option<String> {
-        let list_info = QListAction::new().get_raw(client).await.ok()?;
+        let list_info = QListAction::new().get(client).await.ok()?;
         println!("{:#?}", list_info);
         let name = list_info
             .as_array()?

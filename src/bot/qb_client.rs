@@ -9,7 +9,7 @@ use serde::Serialize;
 use serde_json::Value;
 use tokio::sync::mpsc::Sender;
 
-use crate::bot::commands::{qlist::QListAction, QbCommandAction};
+use crate::bot::commands::{cmd_list::QGetProperties, qlist::QListAction, QbCommandAction};
 
 use super::{
     commands::{
@@ -76,12 +76,13 @@ impl QbClient {
         }
     }
 
-    pub async fn qget(&self, location: &str) -> Result<Response> {
+    pub async fn qget<T: Serialize>(&self, location: &str, action: T) -> Result<Response> {
         let mut api_loc = self.config.location.clone();
         api_loc.push_str(location);
         let resp = self
             .client
             .get(api_loc)
+            .query(&action)
             .send()
             .await
             .with_context(|| "Failed to send GET request")?;
@@ -97,15 +98,7 @@ impl QbClient {
         }
     }
 
-    pub async fn qpost_json_response<T: Serialize>(
-        &self,
-        location: &str,
-        action: T,
-    ) -> Result<Value> {
-        Ok(self.qpost(location, action).await?.json().await?)
-    }
-
-    pub async fn login(&self) -> Result<()> {
+    async fn login(&self) -> Result<()> {
         let login = Login {
             username: self.config.user.clone(),
             password: self.config.password.clone(),
@@ -116,7 +109,11 @@ impl QbClient {
 
     pub async fn get_properties(&self, hash: &str) -> Result<Value> {
         let request_string = format!("/query/propertiesGeneral/{}", hash);
-        let value = self.qget(&request_string).await?.json().await?;
+        let value = self
+            .qget(&request_string, QGetProperties {})
+            .await?
+            .json()
+            .await?;
         Ok(value)
     }
 
@@ -129,7 +126,7 @@ impl QbClient {
         let cmd_result: Box<dyn QbCommandAction> = match tokens.as_slice() {
             ["/help"] => Box::new(QHelp {}),
             ["/start"] => Box::new(QStart {}),
-            ["/list"] => Box::new(QListAction::new().get(&self).await?),
+            ["/list"] => Box::new(QListAction::new().get_formatted(&self).await?),
             ["/download", link] => Box::new(
                 QDownloadAction::new(true, true, tg_tx)
                     .send_link(&self, link)
@@ -148,6 +145,7 @@ impl QbClient {
 
         // Telegram message size is limited by 4096 characters
         let cut_msg: String = prepared.chars().take(4096).collect();
+        // TODO: split message by parts if it does not fit
 
         Ok((cut_msg, cmd_result.parse_mode()))
     }
