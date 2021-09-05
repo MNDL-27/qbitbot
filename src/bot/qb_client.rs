@@ -21,7 +21,7 @@ use super::{
     qbot::{MessageWrapper, RbotParseMode},
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct QbClient {
     pub config: QbConfig,
     client: Client,
@@ -129,7 +129,7 @@ impl QbClient {
         let cmd_result: Box<dyn QbCommandAction> = match tokens.as_slice() {
             ["/help"] => Box::new(QHelp {}),
             ["/start"] => Box::new(QStart {}),
-            ["/list"] => Box::new(QListAction::new().get(&self, "").await?),
+            ["/list"] => Box::new(QListAction::new().get(&self).await?),
             ["/download", link] => Box::new(
                 QDownloadAction::new(true, true, tg_tx)
                     .send_link(&self, link)

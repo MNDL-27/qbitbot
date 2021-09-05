@@ -8,7 +8,6 @@ pub struct Login {
 
 #[derive(Serialize)]
 pub struct QbList {
-    pub filter: String,
 }
 
 #[derive(Serialize)]

@@ -43,20 +43,15 @@ impl QListAction {
         Some(humanized_eta)
     }
 
-    pub async fn get_raw(&self, client: &QbClient, filter: &str) -> Result<Value> {
+    pub async fn get_raw(&self, client: &QbClient) -> Result<Value> {
         let resp = client
-            .qpost_json_response(
-                "/query/torrents",
-                QbList {
-                    filter: filter.to_string(),
-                },
-            )
+            .qpost_json_response("/query/torrents", QbList {})
             .await?;
         Ok(resp)
     }
 
-    pub async fn get(mut self, client: &QbClient, filter: &str) -> Result<Self> {
-        let resp = self.get_raw(client, filter).await?;
+    pub async fn get(mut self, client: &QbClient) -> Result<Self> {
+        let resp = self.get_raw(client).await?;
         self.content = move || -> Option<String> {
             let converted = resp
                 .as_array()?
