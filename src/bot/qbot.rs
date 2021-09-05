@@ -30,7 +30,7 @@ impl QbitBot {
         ));
         QbitBot {
             qbclient: QbClient::new().await,
-            rbot: rbot.clone(),
+            rbot,
             chats: HashMap::new(),
         }
     }

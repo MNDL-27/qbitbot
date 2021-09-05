@@ -11,6 +11,7 @@ impl QbCommandAction for QHelp {
         "/help".to_string()
     }
 
+    // TODO: generate help
     fn action_result_to_string(&self) -> String {
         "Help is here".to_string()
     }

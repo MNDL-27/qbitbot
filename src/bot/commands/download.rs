@@ -8,7 +8,7 @@ use tokio::{
     time::{sleep, Duration},
 };
 
-use super::{cmd_list::QDownload, qlist::QListAction, QbCommandAction};
+use super::{cmd_list::QDownload, list::QListAction, QbCommandAction};
 
 pub struct QDownloadAction {
     status: bool,
@@ -38,7 +38,7 @@ impl QDownloadAction {
     ) -> bool {
         if let Some(hashes) = list_before {
             // give some time to start downloading
-            sleep(Duration::from_millis(500)).await;
+            sleep(Duration::from_millis(1000)).await;
             let list_after = Self::get_hashes(client).await.unwrap_or_default();
             let diff: HashSet<String> = list_after.difference(&hashes).cloned().collect();
             // TODO: fix this barely good check
@@ -77,27 +77,26 @@ impl QDownloadAction {
         Some(hashes)
     }
 
-    async fn get_name(client: &QbClient, hash: &str) -> Option<String> {
+    pub async fn get_name(client: &QbClient, hash: &str) -> Option<String> {
         let list_info = QListAction::new().get(client).await.ok()?;
         println!("{:#?}", list_info);
         let name = list_info
             .as_array()?
-            .iter().find(|item| item.get("hash").unwrap() == hash)?
+            .iter()
+            .find(|item| item.get("hash").unwrap() == hash)?
             .as_object()?
             .get("name")?
             .to_string();
         Some(name)
     }
 
-    
     async fn check_is_complete(client: &QbClient, hash: &str) -> Option<()> {
         // TODO: process accedential torrent remove
         let props = client.get_properties(hash).await.ok()?;
         let obj = props.as_object()?;
-        let eta = obj.get("eta")?.as_i64()?;
-        let total_dowloaded = obj.get("total_downloaded")?.as_i64()?;
-        println!("eta: {}, total: {}", eta, total_dowloaded);
-        if total_dowloaded > 0 && eta == 8640000 {
+        let completion_date = obj.get("completion_date")?.as_i64()?;
+        println!("completion_date: {}", completion_date);
+        if completion_date != -1 {
             Some(())
         } else {
             None

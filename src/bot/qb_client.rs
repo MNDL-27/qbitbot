@@ -9,12 +9,15 @@ use serde::Serialize;
 use serde_json::Value;
 use tokio::sync::mpsc::Sender;
 
-use crate::bot::commands::{cmd_list::QGetProperties, qlist::QListAction, QbCommandAction};
+use crate::bot::commands::{
+    cmd_list::QGetProperties, list::QListAction, pause::QPauseAction, resume::QResumeAction,
+    QbCommandAction,
+};
 
 use super::{
     commands::{
         cmd_list::Login,
-        qdownload::QDownloadAction,
+        download::QDownloadAction,
         simple::{QHelp, QStart, UnknownCommand},
     },
     config::QbConfig,
@@ -117,6 +120,21 @@ impl QbClient {
         Ok(value)
     }
 
+    async fn select_command_with_id(
+        &self,
+        command: &str,
+        id_str: &str,
+    ) -> Result<Box<dyn QbCommandAction>> {
+        let id = id_str.parse::<usize>().unwrap();
+        let action: Box<dyn QbCommandAction> = match command {
+            "/select" => todo!(),
+            "/pause" => Box::new(QPauseAction { status: false }.act(&self, id).await?),
+            "/resume" => Box::new(QResumeAction { status: false }.act(&self, id).await?),
+            _ => Box::new(UnknownCommand {}), // this could never happen
+        };
+        Ok(action)
+    }
+
     pub async fn do_cmd(
         &self,
         text: &str,
@@ -127,6 +145,11 @@ impl QbClient {
             ["/help"] => Box::new(QHelp {}),
             ["/start"] => Box::new(QStart {}),
             ["/list"] => Box::new(QListAction::new().get_formatted(&self).await?),
+            [cmd @ ("/select" | "/pause" | "/resume"), id_str]
+                if id_str.parse::<usize>().is_ok() =>
+            {
+                self.select_command_with_id(cmd, id_str).await?
+            }
             ["/download", link] => Box::new(
                 QDownloadAction::new(true, true, tg_tx)
                     .send_link(&self, link)

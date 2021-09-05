@@ -1,9 +1,11 @@
 use super::qbot::RbotParseMode;
 
 pub mod cmd_list;
-pub mod qlist;
+pub mod list;
 pub mod simple;
-pub mod qdownload;
+pub mod download;
+pub mod pause;
+pub mod resume;
 
 pub trait QbCommandAction {
     /// Command name as it should be written in Telegram chat

@@ -8,14 +8,23 @@ pub struct Login {
 
 #[derive(Serialize)]
 pub struct QbList {
-    pub sort: String
+    pub sort: String,
 }
 
 #[derive(Serialize)]
 pub struct QDownload {
-    pub urls: String
+    pub urls: String,
 }
 
 #[derive(Serialize)]
-pub struct QGetProperties {
+pub struct QGetProperties {}
+
+#[derive(Serialize)]
+pub struct QPause {
+    pub hash: String,
+}
+
+#[derive(Serialize)]
+pub struct QResume {
+    pub hash: String,
 }
