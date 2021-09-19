@@ -19,6 +19,7 @@ use super::{
         cmd_list::{Login, QTag},
         download::QDownloadAction,
         simple::{QHelp, QStart, UnknownCommand},
+        BoxedCommand,
     },
     config::QbConfig,
     qbot::{MessageWrapper, RbotParseMode},
@@ -133,20 +134,19 @@ impl QbClient {
     ) -> Result<(String, RbotParseMode)> {
         let tokens = text.split(' ').collect::<Vec<_>>();
         let cmd_result: Box<dyn QbCommandAction> = match tokens.as_slice() {
-            ["/help"] => Box::new(QHelp {}),
-            ["/start"] => Box::new(QStart {}),
-            ["/list"] => Box::new(QListAction::new().get_formatted(self).await?),
+            ["/help"] => QHelp {}.boxed(),
+            ["/start"] => QStart {}.boxed(),
+            ["/list"] => QListAction::new().get_formatted(self).await?.boxed(),
             [cmd @ ("/select" | "/pause" | "/resume"), id_str]
                 if id_str.parse::<usize>().is_ok() =>
             {
                 self.select_command_with_id(cmd, id_str).await?
             }
-            ["/download", link] => Box::new(
-                QDownloadAction::new(true, true, tg_tx)
-                    .send_link(self, link)
-                    .await?,
-            ),
-            _ => Box::new(UnknownCommand {}),
+            ["/download", link] => QDownloadAction::new(true, true, tg_tx)
+                .send_link(self, link)
+                .await?
+                .boxed(),
+            _ => UnknownCommand {}.boxed(),
         };
 
         // TODO: escape HTML and Markdown special chars

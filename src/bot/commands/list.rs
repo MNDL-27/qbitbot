@@ -11,7 +11,7 @@ use serde_json::Value;
 
 use crate::bot::{commands::cmd_list::QbList, qb_client::QbClient, qbot::RbotParseMode};
 
-use super::QbCommandAction;
+use super::{BoxedCommand, QbCommandAction};
 
 pub struct QListAction {
     content: Option<String>,
@@ -107,3 +107,5 @@ impl QbCommandAction for QListAction {
             .map_or("Failed to get Qbittorrent response".to_string(), |x| x)
     }
 }
+
+impl BoxedCommand for QListAction {}

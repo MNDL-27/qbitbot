@@ -8,7 +8,7 @@ use tokio::{
     time::{sleep, Duration},
 };
 
-use super::{cmd_list::QDownload, list::QListAction, QbCommandAction};
+use super::{BoxedCommand, QbCommandAction, cmd_list::QDownload, list::QListAction};
 
 pub struct QDownloadAction {
     status: bool,
@@ -173,3 +173,5 @@ impl QbCommandAction for QDownloadAction {
         if self.status { "OK" } else { "FAIL" }.to_string()
     }
 }
+
+impl BoxedCommand for QDownloadAction {}

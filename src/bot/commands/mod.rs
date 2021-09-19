@@ -1,11 +1,11 @@
 use super::qbot::RbotParseMode;
 
 pub mod cmd_list;
-pub mod list;
-pub mod simple;
 pub mod download;
+pub mod list;
 pub mod pause;
 pub mod resume;
+pub mod simple;
 
 pub trait QbCommandAction {
     /// Command name as it should be written in Telegram chat
@@ -19,5 +19,11 @@ pub trait QbCommandAction {
     /// Parse mode (HTML or MD). Default is None
     fn parse_mode(&self) -> RbotParseMode {
         None
+    }
+}
+
+pub trait BoxedCommand: QbCommandAction + Sized + 'static {
+    fn boxed(self) -> Box<dyn QbCommandAction> {
+        Box::new(self)
     }
 }
