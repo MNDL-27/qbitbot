@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
 
 use rutebot::{
     client::Rutebot,
@@ -18,16 +18,14 @@ pub struct MessageWrapper {
 }
 
 pub struct QbitBot {
-    pub rbot: Arc<Rutebot>,
+    pub rbot: Rutebot,
     qbclient: QbClient,
     chats: HashMap<i64, Sender<MessageWrapper>>,
 }
 
 impl QbitBot {
     pub async fn new() -> Self {
-        let rbot = Arc::new(Rutebot::new(
-            dotenv::var("TOKEN").expect(&format!(dotenv_err!(), "TOKEN")),
-        ));
+        let rbot = Rutebot::new(dotenv::var("TOKEN").expect(&format!(dotenv_err!(), "TOKEN")));
         QbitBot {
             qbclient: QbClient::new().await,
             rbot,
