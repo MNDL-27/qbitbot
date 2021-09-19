@@ -98,7 +98,6 @@ impl QDownloadAction {
     }
 
     async fn check_is_complete(client: &QbClient, hash: &str) -> CheckStatus {
-        // TODO: process accedential torrent remove
         if let Ok(props) = client.get_properties(hash.to_string()).await {
             let completion_date_opt = move || -> Option<i64> {
                 let obj = props.as_object()?;
