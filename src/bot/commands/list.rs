@@ -1,4 +1,7 @@
-use std::time::{Duration, SystemTime};
+use std::{
+    convert::TryInto,
+    time::{Duration, SystemTime},
+};
 
 use chrono::{DateTime, Local};
 use rutebot::requests::ParseMode;
@@ -31,14 +34,17 @@ impl QListAction {
     }
 
     fn get_eta(item: &Value) -> Option<String> {
-        let eta = item.get("eta")?.as_u64()?;
-        let humanized_eta = if eta == 8640000 {
-            "done".to_string()
-        } else {
-            let secs = SystemTime::now() + Duration::from_secs(eta);
-            DateTime::<Local>::from(secs)
-                .format("%Y-%m-%d %H:%M:%S")
-                .to_string()
+        let eta = item.get("eta")?.as_i64()?;
+        let completion_on = item.get("completion_on")?.as_i64()?;
+        let humanized_eta = match (eta, completion_on) {
+            (8640000, -10800) => "waiting".to_string(),
+            (8640000, _) => "done".to_string(),
+            _ => {
+                let secs = SystemTime::now() + Duration::from_secs(eta.try_into().ok()?);
+                DateTime::<Local>::from(secs)
+                    .format("%Y-%m-%d %H:%M:%S")
+                    .to_string()
+            }
         };
         Some(humanized_eta)
     }
