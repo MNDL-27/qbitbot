@@ -39,10 +39,21 @@ impl QbitBot {
         // TODO: do not create loop for non-admin users
         let tx = self.create_chat_loop(message.chat.id);
         let (response_message, parse_mode) = if self.check_is_admin(&user) {
-            self.qbclient
-                .do_cmd(&message.text?, tx.clone())
-                .await
-                .ok()?
+            let cmd_result = self
+                .qbclient
+                .do_cmd(&message.text.clone()?, tx.clone())
+                .await;
+            match cmd_result {
+                Ok(res) => res,
+                Err(err) => {
+                    println!("{:?}", err);
+                    self.qbclient.login().await.ok()?;
+                    self.qbclient
+                        .do_cmd(&message.text?, tx.clone())
+                        .await
+                        .ok()?
+                }
+            }
         } else {
             ("You are not allowed to chat with me".to_string(), None)
         };

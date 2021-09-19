@@ -83,7 +83,7 @@ impl QbClient {
         }
     }
 
-    async fn login(&self) -> Result<()> {
+    pub async fn login(&self) -> Result<()> {
         let login = Login {
             username: self.config.user.clone(),
             password: self.config.password.clone(),
