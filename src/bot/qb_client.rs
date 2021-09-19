@@ -91,7 +91,7 @@ impl QbClient {
 
     pub async fn get_properties(&self, hash: String) -> Result<Value> {
         let value = self
-            .qpost("/torrents/properties/", QGetProperties { hash })
+            .qpost("/torrents/properties", QGetProperties { hash })
             .await?
             .json()
             .await?;
