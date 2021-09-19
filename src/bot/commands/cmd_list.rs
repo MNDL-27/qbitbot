@@ -7,6 +7,11 @@ pub struct Login {
 }
 
 #[derive(Serialize)]
+pub struct QTag {
+    pub tags: String,
+}
+
+#[derive(Serialize)]
 pub struct QbList {
     pub sort: String,
 }
@@ -14,6 +19,7 @@ pub struct QbList {
 #[derive(Serialize)]
 pub struct QDownload {
     pub urls: String,
+    pub tags: String,
 }
 
 #[derive(Serialize)]

@@ -4,7 +4,9 @@ macro_rules! dotenv_err {
     };
 }
 
-pub mod qbot;
-pub mod config;
+pub const TAG_NAME: &str = "qbitbot";
+
 pub mod commands;
+pub mod config;
 pub mod qb_client;
+pub mod qbot;

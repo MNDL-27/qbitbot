@@ -16,12 +16,13 @@ use crate::bot::commands::{
 
 use super::{
     commands::{
-        cmd_list::Login,
+        cmd_list::{Login, QTag},
         download::QDownloadAction,
         simple::{QHelp, QStart, UnknownCommand},
     },
     config::QbConfig,
     qbot::{MessageWrapper, RbotParseMode},
+    TAG_NAME,
 };
 
 #[derive(Debug, Clone)]
@@ -39,6 +40,7 @@ impl QbClient {
             config,
         };
         qbclient.login().await.unwrap();
+        qbclient.create_tag().await.unwrap();
         qbclient
     }
 
@@ -86,6 +88,17 @@ impl QbClient {
             password: self.config.password.clone(),
         };
         self.qpost("/auth/login", login).await?;
+        Ok(())
+    }
+
+    async fn create_tag(&self) -> Result<()> {
+        self.qpost(
+            "/torrents/createTags",
+            QTag {
+                tags: TAG_NAME.to_string(),
+            },
+        )
+        .await?;
         Ok(())
     }
 

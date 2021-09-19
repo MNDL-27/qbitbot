@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use crate::bot::{qb_client::QbClient, qbot::MessageWrapper};
+use crate::bot::{qb_client::QbClient, qbot::MessageWrapper, TAG_NAME};
 use anyhow::{anyhow, Result};
 use reqwest::Response;
 use tokio::{
@@ -65,6 +65,7 @@ impl QDownloadAction {
                 "/torrents/add",
                 QDownload {
                     urls: link.to_string(),
+                    tags: TAG_NAME.to_string(),
                 },
             )
             .await?;
@@ -131,6 +132,7 @@ impl QDownloadAction {
                             parse_mode: None,
                         };
                         tg_tx.send(msg).await;
+                        return;
                     }
                     CheckStatus::InProgress => sleep(Duration::from_millis(1000)).await,
                     CheckStatus::Fail => {
