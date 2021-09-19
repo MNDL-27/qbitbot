@@ -17,14 +17,16 @@ pub struct QDownload {
 }
 
 #[derive(Serialize)]
-pub struct QGetProperties {}
+pub struct QGetProperties {
+    pub hash: String
+}
 
 #[derive(Serialize)]
 pub struct QPause {
-    pub hash: String,
+    pub hashes: String,
 }
 
 #[derive(Serialize)]
 pub struct QResume {
-    pub hash: String,
+    pub hashes: String,
 }

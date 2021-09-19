@@ -19,6 +19,12 @@ pub struct QDownloadAction {
     tg_tx: Sender<MessageWrapper>,
 }
 
+enum CheckStatus {
+    Done,
+    InProgress,
+    Fail,
+}
+
 impl QDownloadAction {
     pub fn new(validate: bool, notify: bool, tg_tx: Sender<MessageWrapper>) -> Self {
         QDownloadAction {
@@ -56,7 +62,7 @@ impl QDownloadAction {
     async fn inner_send(client: &QbClient, link: &str) -> Result<Response> {
         let resp = client
             .qpost(
-                "/command/download",
+                "/torrents/add",
                 QDownload {
                     urls: link.to_string(),
                 },
@@ -90,16 +96,24 @@ impl QDownloadAction {
         Some(name)
     }
 
-    async fn check_is_complete(client: &QbClient, hash: &str) -> Option<()> {
+    async fn check_is_complete(client: &QbClient, hash: &str) -> CheckStatus {
         // TODO: process accedential torrent remove
-        let props = client.get_properties(hash).await.ok()?;
-        let obj = props.as_object()?;
-        let completion_date = obj.get("completion_date")?.as_i64()?;
-        println!("completion_date: {}", completion_date);
-        if completion_date != -1 {
-            Some(())
+        if let Ok(props) = client.get_properties(hash.to_string()).await {
+            let completion_date_opt = move || -> Option<i64> {
+                let obj = props.as_object()?;
+                obj.get("completion_date")?.as_i64()
+            }();
+            if let Some(completion_date) = completion_date_opt {
+                if completion_date != -1 {
+                    CheckStatus::Done
+                } else {
+                    CheckStatus::InProgress
+                }
+            } else {
+                CheckStatus::Fail
+            }
         } else {
-            None
+            CheckStatus::Fail
         }
     }
 
@@ -109,15 +123,22 @@ impl QDownloadAction {
         let name = self.torrent_name.clone();
         let my_client = (*client).clone();
         tokio::spawn(async move {
-            while Self::check_is_complete(&my_client, &hash).await.is_none() {
-                sleep(Duration::from_millis(1000)).await
+            loop {
+                match Self::check_is_complete(&my_client, &hash).await {
+                    CheckStatus::Done => {
+                        let msg = MessageWrapper {
+                            text: format!("{} is done", name),
+                            parse_mode: None,
+                        };
+                        tg_tx.send(msg).await;
+                    }
+                    CheckStatus::InProgress => sleep(Duration::from_millis(1000)).await,
+                    CheckStatus::Fail => {
+                        println!("Failed to get torrent status");
+                        return;
+                    }
+                }
             }
-
-            let msg = MessageWrapper {
-                text: format!("{} is done", name),
-                parse_mode: None,
-            };
-            tg_tx.send(msg).await;
         });
         println!("Created notify loop for {}", self.torrent_name);
     }

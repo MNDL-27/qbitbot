@@ -59,6 +59,7 @@ impl QbClient {
 
     pub async fn qpost<T: Serialize>(&self, location: &str, action: T) -> Result<Response> {
         let mut api_loc = self.config.location.clone();
+        api_loc.push_str("/api/v2");
         api_loc.push_str(location);
         let resp = self
             .client
@@ -79,41 +80,18 @@ impl QbClient {
         }
     }
 
-    pub async fn qget<T: Serialize>(&self, location: &str, action: T) -> Result<Response> {
-        let mut api_loc = self.config.location.clone();
-        api_loc.push_str(location);
-        let resp = self
-            .client
-            .get(api_loc)
-            .query(&action)
-            .send()
-            .await
-            .with_context(|| "Failed to send GET request")?;
-
-        if resp.status().is_success() {
-            println!("{:#?}", resp);
-            Ok(resp)
-        } else {
-            Err(anyhow!(format!(
-                "Command failed. Status code: {}",
-                resp.status()
-            )))
-        }
-    }
-
     async fn login(&self) -> Result<()> {
         let login = Login {
             username: self.config.user.clone(),
             password: self.config.password.clone(),
         };
-        self.qpost("/login", login).await?;
+        self.qpost("/auth/login", login).await?;
         Ok(())
     }
 
-    pub async fn get_properties(&self, hash: &str) -> Result<Value> {
-        let request_string = format!("/query/propertiesGeneral/{}", hash);
+    pub async fn get_properties(&self, hash: String) -> Result<Value> {
         let value = self
-            .qget(&request_string, QGetProperties {})
+            .qpost("/torrents/properties/", QGetProperties { hash })
             .await?
             .json()
             .await?;
@@ -128,8 +106,8 @@ impl QbClient {
         let id = id_str.parse::<usize>().unwrap();
         let action: Box<dyn QbCommandAction> = match command {
             "/select" => todo!(),
-            "/pause" => Box::new(QPauseAction { status: false }.act(&self, id).await?),
-            "/resume" => Box::new(QResumeAction { status: false }.act(&self, id).await?),
+            "/pause" => Box::new(QPauseAction { status: false }.act(self, id).await?),
+            "/resume" => Box::new(QResumeAction { status: false }.act(self, id).await?),
             _ => Box::new(UnknownCommand {}), // this could never happen
         };
         Ok(action)
@@ -144,7 +122,7 @@ impl QbClient {
         let cmd_result: Box<dyn QbCommandAction> = match tokens.as_slice() {
             ["/help"] => Box::new(QHelp {}),
             ["/start"] => Box::new(QStart {}),
-            ["/list"] => Box::new(QListAction::new().get_formatted(&self).await?),
+            ["/list"] => Box::new(QListAction::new().get_formatted(self).await?),
             [cmd @ ("/select" | "/pause" | "/resume"), id_str]
                 if id_str.parse::<usize>().is_ok() =>
             {
@@ -152,7 +130,7 @@ impl QbClient {
             }
             ["/download", link] => Box::new(
                 QDownloadAction::new(true, true, tg_tx)
-                    .send_link(&self, link)
+                    .send_link(self, link)
                     .await?,
             ),
             _ => Box::new(UnknownCommand {}),

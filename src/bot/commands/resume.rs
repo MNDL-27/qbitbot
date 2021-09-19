@@ -48,9 +48,9 @@ impl QResumeAction {
             .ok_or_else(|| anyhow!("ID to hash conversion failed"))?;
         client
             .qpost(
-                "/command/resume",
+                "/torrents/resume",
                 QResume {
-                    hash: hash.to_string(),
+                    hashes: hash.to_string(),
                 },
             )
             .await?;

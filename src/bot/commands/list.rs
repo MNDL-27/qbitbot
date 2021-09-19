@@ -45,8 +45,8 @@ impl QListAction {
 
     pub async fn get(&self, client: &QbClient) -> Result<Value> {
         let resp = client
-            .qget(
-                "/query/torrents",
+            .qpost(
+                "/torrents/info",
                 QbList {
                     sort: "hash".to_string(),
                 },

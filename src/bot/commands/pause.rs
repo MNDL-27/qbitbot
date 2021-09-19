@@ -44,9 +44,9 @@ impl QPauseAction {
             .ok_or_else(|| anyhow!("ID to hash conversion failed"))?;
         client
             .qpost(
-                "/command/pause",
+                "/torrents/pause",
                 QPause {
-                    hash: hash.to_string(),
+                    hashes: hash.to_string(),
                 },
             )
             .await?;
