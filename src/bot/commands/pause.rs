@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use crate::bot::{commands::list::QListAction, qb_client::QbClient};
 
-use super::{cmd_list::QPause, QbCommandAction};
+use super::{BoxedCommand, QbCommandAction, cmd_list::QPause};
 use anyhow::{anyhow, Result};
 use tokio::time::sleep;
 
@@ -64,3 +64,5 @@ impl QbCommandAction for QPauseAction {
         if self.status { "OK" } else { "FAIL" }.to_string()
     }
 }
+
+impl BoxedCommand for QPauseAction {}

@@ -120,9 +120,9 @@ impl QbClient {
         let id = id_str.parse::<usize>().unwrap();
         let action: Box<dyn QbCommandAction> = match command {
             "/select" => todo!(),
-            "/pause" => Box::new(QPauseAction { status: false }.act(self, id).await?),
-            "/resume" => Box::new(QResumeAction { status: false }.act(self, id).await?),
-            _ => Box::new(UnknownCommand {}), // this could never happen
+            "/pause" => QPauseAction { status: false }.act(self, id).await?.boxed(),
+            "/resume" => QResumeAction { status: false }.act(self, id).await?.boxed(),
+            _ => UnknownCommand {}.boxed(), // this could never happen
         };
         Ok(action)
     }
