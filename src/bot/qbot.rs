@@ -50,7 +50,7 @@ impl QbitBot {
         let user = message.from?;
         let text = message.text?;
         // TODO: do not create loop for non-admin users
-        let tx = self.create_chat_loop(message.chat.id);
+        let tx = self.get_chat_loop(message.chat.id);
         tokio::spawn(async move {
             let (response_message, parse_mode) = if self.check_is_admin(&user) {
                 let cmd_result = self.chat_work(&text, &tx).await;
@@ -87,28 +87,33 @@ impl QbitBot {
         }
     }
 
-    fn create_chat_loop(&self, chat_id: i64) -> Sender<MessageWrapper> {
-        if let Some(tx) = self.chats.read().unwrap().get(&chat_id) {
-            tx.clone()
-        } else {
-            let (tx, mut rx): (Sender<MessageWrapper>, Receiver<MessageWrapper>) =
-                mpsc::channel(32);
-            let rbot = self.rbot.clone();
-            tokio::spawn(async move {
-                while let Some(message) = rx.recv().await {
-                    println!("{:#?}", message);
-                    let reply = SendMessage {
-                        parse_mode: message.parse_mode,
-                        ..SendMessage::new(chat_id, &message.text)
-                    };
-                    rbot.prepare_api_request(reply).send().await;
-                }
-            });
-            self.chats
-                .write()
-                .unwrap()
-                .extend(vec![(chat_id, tx.clone())]);
-            tx
+    fn get_tx_if_exists(&self, chat_id: i64) -> Option<Sender<MessageWrapper>> {
+        let chats = self.chats.read().unwrap();
+        chats.get(&chat_id).cloned()
+    }
+
+    fn get_chat_loop(&self, chat_id: i64) -> Sender<MessageWrapper> {
+        if let Some(tx) = self.get_tx_if_exists(chat_id) {
+            return tx;
         }
+        let (tx, mut rx): (Sender<MessageWrapper>, Receiver<MessageWrapper>) = mpsc::channel(32);
+        let rbot = self.rbot.clone();
+        tokio::spawn(async move {
+            while let Some(message) = rx.recv().await {
+                println!("{:#?}", message);
+                let reply = SendMessage {
+                    parse_mode: message.parse_mode,
+                    ..SendMessage::new(chat_id, &message.text)
+                };
+                if rbot.prepare_api_request(reply).send().await.is_err() {
+                    println!("Failed to send reply")
+                };
+            }
+        });
+        self.chats
+            .write()
+            .unwrap()
+            .extend(vec![(chat_id, tx.clone())]);
+        tx
     }
 }

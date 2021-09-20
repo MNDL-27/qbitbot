@@ -132,7 +132,6 @@ impl QbClient {
         text: &str,
         tg_tx: Sender<MessageWrapper>,
     ) -> Result<(String, RbotParseMode)> {
-        tokio::time::sleep(Duration::from_secs(2)).await;
         let tokens = text.split(' ').collect::<Vec<_>>();
         let cmd_result: Box<dyn QbCommandAction> = match tokens.as_slice() {
             ["/help"] => QHelp {}.boxed(),
