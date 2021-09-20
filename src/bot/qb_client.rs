@@ -117,7 +117,7 @@ impl QbClient {
         command: &str,
         id_str: &str,
     ) -> Result<Box<dyn QbCommandAction>> {
-        let id = id_str.parse::<usize>().unwrap();
+        let id = id_str.parse::<usize>()?;
         let action: Box<dyn QbCommandAction> = match command {
             "/select" => todo!(),
             "/pause" => QPauseAction { status: false }.act(self, id).await?.boxed(),
