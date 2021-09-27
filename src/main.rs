@@ -12,6 +12,7 @@ async fn main() {
     let mut updates_stream = Box::pin(qbot.rbot.incoming_updates(None, None));
     let qbot_arc = Arc::new(qbot);
     loop {
+        println!("Next iteration");
         match updates_stream.next().await.transpose() {
             Ok(update_opt) => {
                 if let Some(update) = update_opt {
