@@ -45,7 +45,7 @@ impl QbitBot {
         self.qbclient.do_cmd(text, tx.clone()).await
     }
 
-    pub async fn proccess_message(self: Arc<Self>, update: Update) -> Option<()> {
+    pub fn proccess_message(self: Arc<Self>, update: Update) -> Option<()> {
         let message = update.message?;
         let user = message.from?;
         let text = message.text?;
