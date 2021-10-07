@@ -73,7 +73,7 @@ impl QbClient {
             .with_context(|| "Failed to send POST request")?;
 
         if resp.status().is_success() {
-            println!("{:#?}", resp);
+            trace!("{:#?}", resp);
             Ok(resp)
         } else {
             Err(anyhow!(format!(

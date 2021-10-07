@@ -1,27 +1,38 @@
-mod bot;
+#[macro_use] extern crate log;
+extern crate pretty_env_logger;
 
 use std::sync::Arc;
 
-use bot::qbot::QbitBot;
 use futures_util::stream::StreamExt;
+
+use bot::qbot::QbitBot;
+
+mod bot;
+
+fn get_loglevel() -> String {
+    match dotenv::var("LOG_LEVEL") {
+        Ok(loglevel) => loglevel,
+        Err(_) => "info".to_string()
+    }
+}
 
 #[tokio::main]
 async fn main() {
+    pretty_env_logger::formatted_builder().parse_filters(get_loglevel().as_str()).init();
     let qbot = QbitBot::new().await;
-    println!("QbitBot launched");
+    info!("QbitBot launched");
     let mut updates_stream = Box::pin(qbot.rbot.incoming_updates(None, None));
     let qbot_arc = Arc::new(qbot);
     loop {
         match updates_stream.next().await.transpose() {
             Ok(update_opt) => {
                 if let Some(update) = update_opt {
-                    let res = QbitBot::proccess_message(qbot_arc.clone(), update);
-                    println!("{:#?}", res)
+                    QbitBot::proccess_message(qbot_arc.clone(), update);
                 } else {
-                    println!("Failed to parse message from Telegram")
+                    error!("Failed to parse message from Telegram")
                 }
             }
-            Err(err) => println!("{:#?}", err),
+            Err(err) => error!("{:#?}", err),
         };
     }
 }

@@ -47,12 +47,12 @@ impl QbitBot {
 
     pub fn proccess_message(self: Arc<Self>, update: Update) -> Option<()> {
         let message = update.message?;
-        let user = message.from?;
+        let username = message.from?.username?;
         let text = message.text?;
         // TODO: do not create loop for non-admin users
         let tx = self.get_chat_loop(message.chat.id);
         tokio::spawn(async move {
-            let (response_message, parse_mode) = if self.check_is_admin(&user) {
+            let (response_message, parse_mode) = if self.qbclient.config.admins.contains(&username) {
                 let cmd_result = self.chat_work(&text, &tx).await;
                 if let Ok(res) = cmd_result {
                     res
@@ -66,6 +66,7 @@ impl QbitBot {
                         .expect("Command execution failed")
                 }
             } else {
+                info!("User {} tried to chat with qbot but he does not have access", username);
                 ("You are not allowed to chat with me".to_string(), None)
             };
             let wrapped_msg = MessageWrapper {
@@ -74,18 +75,10 @@ impl QbitBot {
             };
             let res = tx.send(wrapped_msg).await;
             if res.is_err() {
-                println!("{:#?}", res);
+                error!("Couldn't send into tx: {:#?}", res);
             };
         });
         Some(())
-    }
-
-    pub fn check_is_admin(&self, user: &User) -> bool {
-        if let Some(username) = &user.username {
-            self.qbclient.config.admins.contains(username)
-        } else {
-            false
-        }
     }
 
     fn get_tx_if_exists(&self, chat_id: i64) -> Option<Sender<MessageWrapper>> {
@@ -101,13 +94,13 @@ impl QbitBot {
         let rbot = self.rbot.clone();
         tokio::spawn(async move {
             while let Some(message) = rx.recv().await {
-                println!("{:#?}", message);
+                debug!("Sending message: {:#?}", message);
                 let reply = SendMessage {
                     parse_mode: message.parse_mode,
                     ..SendMessage::new(chat_id, &message.text)
                 };
                 if rbot.prepare_api_request(reply).send().await.is_err() {
-                    println!("Failed to send reply")
+                    error!("Failed to send reply using rutebot")
                 };
             }
         });

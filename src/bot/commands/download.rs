@@ -86,7 +86,6 @@ impl QDownloadAction {
 
     pub async fn get_name(client: &QbClient, hash: &str) -> Option<String> {
         let list_info = QListAction::new().get(client).await.ok()?;
-        println!("{:#?}", list_info);
         let name = list_info
             .as_array()?
             .iter()
@@ -135,13 +134,13 @@ impl QDownloadAction {
                     }
                     CheckStatus::InProgress => sleep(Duration::from_millis(1000)).await,
                     CheckStatus::Fail => {
-                        println!("Failed to get torrent status");
+                        error!("Failed to get torrent status: {}", name);
                         return;
                     }
                 }
             }
         });
-        println!("Created notify loop for {}", self.torrent_name);
+        info!("Created notify loop for {}", self.torrent_name);
     }
 
     pub async fn send_link(mut self, client: &QbClient, link: &str) -> Result<Self> {

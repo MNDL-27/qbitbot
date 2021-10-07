@@ -22,7 +22,7 @@ impl QResumeAction {
             .iter()
             .find(|item| item.get("hash").unwrap() == hash)?;
         let state = item.as_object()?.get("state")?.to_owned();
-        println!("State: {}", state);
+        debug!("Hash {} state: {}", hash, state);
         if !state.as_str()?.contains("paused") {
             Some(())
         } else {
