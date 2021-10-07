@@ -186,6 +186,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "fure"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7af4d984b5606dc9adba4a5afc8ff0f63b9ac17533c3e4edecc43f7ba125c9d0"
+dependencies = [
+ "pin-project-lite",
+ "rand",
+ "tokio",
+]
+
+[[package]]
 name = "futures"
 version = "0.3.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -851,11 +862,12 @@ dependencies = [
 
 [[package]]
 name = "rutebot"
-version = "0.7.0"
+version = "0.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "872027b886c133ee6f60cf6b75876ab64ee1b5d8dd42368040e14af5d52d31d9"
+checksum = "8cf6822dc00a17b719aedae964bd214bc3f13c0e3ba5b4033066398d9bf49ac9"
 dependencies = [
  "bytes",
+ "fure",
  "futures-util",
  "hyper",
  "hyper-multipart-rfc7578",
