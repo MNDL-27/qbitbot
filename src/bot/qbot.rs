@@ -72,8 +72,9 @@ impl QbitBot {
                 text: response_message,
                 parse_mode,
             };
-            if tx.send(wrapped_msg).await.is_err() {
-                println!("Failed to send reply")
+            let res = tx.send(wrapped_msg).await;
+            if res.is_err() {
+                println!("{:#?}", res);
             };
         });
         Some(())
