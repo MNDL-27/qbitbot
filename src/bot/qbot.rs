@@ -3,16 +3,15 @@ use std::{
     sync::{Arc, RwLock},
 };
 
-use anyhow::Result;
 use rutebot::{
     client::Rutebot,
-    requests::{ParseMode, SendMessage},
+    requests::ParseMode,
     responses::{Update, User},
 };
-use tokio::sync::mpsc::{self, Receiver, Sender};
+
+use crate::bot::qb_chat::QbChat;
 
 use super::qb_client::QbClient;
-use crate::bot::qb_chat::QbChat;
 
 pub type RbotParseMode = Option<ParseMode>;
 
@@ -41,22 +40,12 @@ impl QbitBot {
     pub async fn process_message(self: Arc<Self>, update: Update) -> Option<()> {
         let message = update.message?;
         let text = message.text?;
-        debug!("Checking whether chat_id is presented or not");
-        let maybe_chat = {
-            let lock = self.chats.read().unwrap();
-            lock.get(&message.chat.id).is_some()
-        };
-        if maybe_chat {
-            let mut lock = self.chats.write().unwrap();
-            let chat = lock.get_mut(&message.chat.id).unwrap();
-            chat.select_goto(&text).await;
-        } else {
-            debug!("Created new chat");
-            let mut chat = QbChat::new(message.chat.id, self.rbot.clone());
-            let mut lock = self.chats.write().unwrap();
-            lock.insert(message.chat.id, chat.clone());
-            chat.select_goto(&text).await;
-        };
+        let chat_id = message.chat.id;
+        let mut lock = self.chats.write().unwrap();
+        let chat = lock.entry(chat_id).or_insert_with(|| {
+            QbChat::new(chat_id, self.rbot.clone())
+        });
+        chat.select_goto(&text).await;
         Some(())
     }
 }
