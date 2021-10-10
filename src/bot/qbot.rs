@@ -12,6 +12,7 @@ use rutebot::{
 use tokio::sync::mpsc::{self, Receiver, Sender};
 
 use super::qb_client::QbClient;
+use crate::bot::qb_chat::QbChat;
 
 pub type RbotParseMode = Option<ParseMode>;
 
@@ -24,7 +25,7 @@ pub struct MessageWrapper {
 pub struct QbitBot {
     pub rbot: Rutebot,
     qbclient: QbClient,
-    chats: Arc<RwLock<HashMap<i64, Sender<MessageWrapper>>>>,
+    chats: RwLock<HashMap<i64, QbChat>>,
 }
 
 impl QbitBot {
@@ -33,81 +34,29 @@ impl QbitBot {
         QbitBot {
             qbclient: QbClient::new().await,
             rbot,
-            chats: Arc::new(RwLock::new(HashMap::new())),
+            chats: RwLock::new(HashMap::new()),
         }
     }
 
-    async fn chat_work(
-        &self,
-        text: &str,
-        tx: &Sender<MessageWrapper>,
-    ) -> Result<(String, RbotParseMode)> {
-        self.qbclient.do_cmd(text, tx.clone()).await
-    }
-
-    pub fn proccess_message(self: Arc<Self>, update: Update) -> Option<()> {
+    pub async fn process_message(self: Arc<Self>, update: Update) -> Option<()> {
         let message = update.message?;
-        let username = message.from?.username?;
         let text = message.text?;
-        // TODO: do not create loop for non-admin users
-        let tx = self.get_chat_loop(message.chat.id);
-        tokio::spawn(async move {
-            let (response_message, parse_mode) = if self.qbclient.config.admins.contains(&username) {
-                let cmd_result = self.chat_work(&text, &tx).await;
-                if let Ok(res) = cmd_result {
-                    res
-                } else {
-                    self.qbclient
-                        .login()
-                        .await
-                        .expect("Couldnt re-login into qBittorrent");
-                    self.chat_work(&text, &tx)
-                        .await
-                        .expect("Command execution failed")
-                }
-            } else {
-                info!("User {} tried to chat with qbot but he does not have access", username);
-                ("You are not allowed to chat with me".to_string(), None)
-            };
-            let wrapped_msg = MessageWrapper {
-                text: response_message,
-                parse_mode,
-            };
-            let res = tx.send(wrapped_msg).await;
-            if res.is_err() {
-                error!("Couldn't send into tx: {:#?}", res);
-            };
-        });
+        debug!("Checking whether chat_id is presented or not");
+        let maybe_chat = {
+            let lock = self.chats.read().unwrap();
+            lock.get(&message.chat.id).is_some()
+        };
+        if maybe_chat {
+            let mut lock = self.chats.write().unwrap();
+            let chat = lock.get_mut(&message.chat.id).unwrap();
+            chat.select_goto(&text).await;
+        } else {
+            debug!("Created new chat");
+            let mut chat = QbChat::new(message.chat.id, self.rbot.clone());
+            let mut lock = self.chats.write().unwrap();
+            lock.insert(message.chat.id, chat.clone());
+            chat.select_goto(&text).await;
+        };
         Some(())
-    }
-
-    fn get_tx_if_exists(&self, chat_id: i64) -> Option<Sender<MessageWrapper>> {
-        let chats = self.chats.read().unwrap();
-        chats.get(&chat_id).cloned()
-    }
-
-    fn get_chat_loop(&self, chat_id: i64) -> Sender<MessageWrapper> {
-        if let Some(tx) = self.get_tx_if_exists(chat_id) {
-            return tx;
-        }
-        let (tx, mut rx): (Sender<MessageWrapper>, Receiver<MessageWrapper>) = mpsc::channel(32);
-        let rbot = self.rbot.clone();
-        tokio::spawn(async move {
-            while let Some(message) = rx.recv().await {
-                debug!("Sending message: {:#?}", message);
-                let reply = SendMessage {
-                    parse_mode: message.parse_mode,
-                    ..SendMessage::new(chat_id, &message.text)
-                };
-                if rbot.prepare_api_request(reply).send().await.is_err() {
-                    error!("Failed to send reply using rutebot")
-                };
-            }
-        });
-        self.chats
-            .write()
-            .unwrap()
-            .extend(vec![(chat_id, tx.clone())]);
-        tx
     }
 }

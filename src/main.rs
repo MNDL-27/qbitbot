@@ -27,7 +27,7 @@ async fn main() {
         match updates_stream.next().await.transpose() {
             Ok(update_opt) => {
                 if let Some(update) = update_opt {
-                    QbitBot::proccess_message(qbot_arc.clone(), update);
+                    QbitBot::process_message(qbot_arc.clone(), update).await;
                 } else {
                     error!("Failed to parse message from Telegram")
                 }
