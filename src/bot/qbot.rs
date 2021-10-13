@@ -23,7 +23,7 @@ pub struct MessageWrapper {
 
 pub struct QbitBot {
     pub rbot: Rutebot,
-    qbclient: QbClient,
+    qbclient: Arc<QbClient>,
     chats: RwLock<HashMap<i64, QbChat>>,
 }
 
@@ -31,7 +31,7 @@ impl QbitBot {
     pub async fn new() -> Self {
         let rbot = Rutebot::new(dotenv::var("TOKEN").expect(&format!(dotenv_err!(), "TOKEN")));
         QbitBot {
-            qbclient: QbClient::new().await,
+            qbclient: Arc::new(QbClient::new().await),
             rbot,
             chats: RwLock::new(HashMap::new()),
         }
@@ -43,7 +43,7 @@ impl QbitBot {
         let chat_id = message.chat.id;
         let mut lock = self.chats.write().unwrap();
         let chat = lock.entry(chat_id).or_insert_with(|| {
-            QbChat::new(chat_id, self.rbot.clone())
+            QbChat::new(chat_id, self.rbot.clone(), self.qbclient.clone())
         });
         chat.select_goto(&text).await;
         Some(())

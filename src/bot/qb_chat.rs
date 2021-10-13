@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::Arc;
 use std::time::Duration;
 
 use fure::backoff::fixed;
@@ -7,7 +8,12 @@ use rutebot::client::Rutebot;
 use rutebot::requests::SendMessage;
 
 use crate::bot::qb_chat::MenuValue::*;
+use crate::bot::qb_client::QbClient;
 use crate::bot::qbot::MessageWrapper;
+use crate::bot::commands::simple::QHelp;
+use crate::bot::commands::BoxedCommand;
+use crate::bot::commands::list::QListAction;
+use std::ops::Deref;
 
 #[derive(Clone, Debug)]
 enum MenuValue {
@@ -28,16 +34,6 @@ impl MenuValue {
             Help => "/help",
             List => "/list",
             Download => "/download"
-        }
-    }
-
-    pub fn get_menu_content(&self) -> String {
-        match self {
-            Main => "Main menu".to_string(),
-            Torrent => "Torrent menu".to_string(),
-            Help => "Help is here".to_string(),
-            List => "List".to_string(),
-            Download => "Download".to_string()
         }
     }
 
@@ -87,8 +83,7 @@ impl From<MenuValue> for MenuTree {
 }
 
 impl MenuTree {
-    pub fn show(&self) -> String {
-        let content = self.value.get_menu_content();
+    pub async fn show(&self, content: String) -> String {
         format!("{}\nButtons:\n{}\n/back", content, self.print_children().as_str())
     }
 
@@ -97,21 +92,32 @@ impl MenuTree {
     }
 }
 
-#[derive(Clone)]
 pub struct QbChat {
     chat_id: i64,
     menu_pos: MenuTree,
     rbot: Rutebot,
+    qbclient: Arc<QbClient>,
     commands_map: HashMap<String, MenuValue>,
 }
 
 impl QbChat {
-    pub fn new(chat_id: i64, rbot: Rutebot) -> Self {
+    pub fn new(chat_id: i64, rbot: Rutebot, qbclient: Arc<QbClient>) -> Self {
         Self {
             chat_id,
             rbot,
+            qbclient,
             menu_pos: MenuTree::from(Main),
             commands_map: MenuValue::generate_cmds(),
+        }
+    }
+
+    async fn do_cmd(&self) -> String {
+        match self.menu_pos.value {
+            Main => "Main menu".to_string(),
+            Help => QHelp {}.boxed().action_result_to_string(),
+            List => QListAction::new().get_formatted(self.qbclient.deref()).await.unwrap().boxed().action_result_to_string(),
+            Download => todo!(),
+            _ => "No content".to_string()
         }
     }
 
@@ -126,10 +132,11 @@ impl QbChat {
 
     async fn goto(&mut self, menu_value: MenuValue) {
         self.menu_pos = MenuTree::from(menu_value);
-        let text = self.menu_pos.show();
+        let content = self.do_cmd().await;
+        let text = self.menu_pos.show(content).await;
         let message = MessageWrapper {
             text,
-            parse_mode: Some(rutebot::requests::ParseMode::Markdown),
+            parse_mode: Some(rutebot::requests::ParseMode::Html),
         };
         self.send_message(message).await;
     }
