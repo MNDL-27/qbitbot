@@ -1,14 +1,11 @@
 use std::collections::HashSet;
 
-use crate::bot::{qb_client::QbClient, qbot::MessageWrapper, TAG_NAME};
+use crate::bot::{qb_chat::NotifyClosure, qb_client::QbClient, qbot::MessageWrapper, TAG_NAME};
 use anyhow::{anyhow, Result};
 use reqwest::Response;
-use tokio::{
-    sync::mpsc::Sender,
-    time::{sleep, Duration},
-};
+use tokio::time::{sleep, Duration};
 
-use super::{BoxedCommand, QbCommandAction, cmd_list::QDownload, list::QListAction};
+use super::{cmd_list::QDownload, list::QListAction, BoxedCommand, QbCommandAction};
 
 pub struct QDownloadAction {
     status: bool,
@@ -16,24 +13,21 @@ pub struct QDownloadAction {
     notify: bool,
     torrent_hash: String,
     torrent_name: String,
-    tg_tx: Sender<MessageWrapper>,
 }
 
 enum CheckStatus {
     Done,
-    InProgress,
     Fail,
 }
 
 impl QDownloadAction {
-    pub fn new(validate: bool, notify: bool, tg_tx: Sender<MessageWrapper>) -> Self {
+    pub fn new(validate: bool, notify: bool) -> Self {
         QDownloadAction {
             status: false,
             validate,
             notify,
             torrent_hash: "".to_string(),
             torrent_name: "".to_string(),
-            tg_tx,
         }
     }
 
@@ -106,7 +100,7 @@ impl QDownloadAction {
                 if completion_date != -1 {
                     CheckStatus::Done
                 } else {
-                    CheckStatus::InProgress
+                    CheckStatus::Fail
                 }
             } else {
                 CheckStatus::Fail
@@ -116,34 +110,22 @@ impl QDownloadAction {
         }
     }
 
-    fn create_notify(&self, client: &QbClient) {
-        let tg_tx = self.tg_tx.clone();
-        let hash = self.torrent_hash.clone();
-        let name = self.torrent_name.clone();
-        let my_client = (*client).clone();
-        tokio::spawn(async move {
-            loop {
-                match Self::check_is_complete(&my_client, &hash).await {
-                    CheckStatus::Done => {
-                        let msg = MessageWrapper {
-                            text: format!("{} is done", name),
-                            parse_mode: None,
-                        };
-                        tg_tx.send(msg).await;
-                        return;
-                    }
-                    CheckStatus::InProgress => sleep(Duration::from_millis(1000)).await,
-                    CheckStatus::Fail => {
-                        error!("Failed to get torrent status: {}", name);
-                        return;
-                    }
-                }
+    async fn notify(client: &QbClient, hash: String, name: String) -> Result<MessageWrapper> {
+        let res = match Self::check_is_complete(&client, &hash).await {
+            CheckStatus::Done => Ok(MessageWrapper {
+                text: format!("{} is done", name),
+                parse_mode: None,
+            }),
+            CheckStatus::Fail => {
+                error!("Failed to get torrent status: {}", name);
+                Err(anyhow!("Failed to get torrent status"))
             }
-        });
-        info!("Created notify loop for {}", self.torrent_name);
+        };
+        info!("Created notify loop for {}", name);
+        res
     }
 
-    pub async fn send_link(mut self, client: &QbClient, link: &str) -> Result<Self> {
+    pub async fn send_link(mut self, client: & QbClient, link: &str) -> Result<Self> {
         if self.validate {
             let list_before = Self::get_hashes(client).await;
             let send_resp = Self::inner_send(client, link).await?;
@@ -153,7 +135,13 @@ impl QDownloadAction {
                 self.torrent_name = Self::get_name(client, &self.torrent_hash)
                     .await
                     .ok_or_else(|| anyhow!("Failed to get torrent name"))?;
-                self.create_notify(client)
+                // let (hash, name) = (self.torrent_hash.clone(), self.torrent_name.clone());
+                // let a: NotifyClosure = Box::new(|| {
+                //     Box::pin(async {
+                //         Self::notify(client, hash, name)
+                //             .await
+                //     })
+                // });
             }
         } else {
             let send_resp = Self::inner_send(client, link).await?;

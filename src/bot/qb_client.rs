@@ -127,40 +127,40 @@ impl QbClient {
         Ok(action)
     }
 
-    pub async fn do_cmd(
-        &self,
-        text: &str,
-        tg_tx: Sender<MessageWrapper>,
-    ) -> Result<(String, RbotParseMode)> {
-        let tokens = text.split(' ').collect::<Vec<_>>();
-        let cmd_result: Box<dyn QbCommandAction> = match tokens.as_slice() {
-            ["/help"] => QHelp {}.boxed(),
-            ["/start"] => QStart {}.boxed(),
-            ["/list"] => QListAction::new().get_formatted(self).await?.boxed(),
-            [cmd @ ("/select" | "/pause" | "/resume"), id_str]
-                if id_str.parse::<usize>().is_ok() =>
-            {
-                self.select_command_with_id(cmd, id_str).await?
-            }
-            ["/download", link] => QDownloadAction::new(true, true, tg_tx)
-                .send_link(self, link)
-                .await?
-                .boxed(),
-            _ => UnknownCommand {}.boxed(),
-        };
+    // pub async fn do_cmd(
+    //     &self,
+    //     text: &str,
+    //     tg_tx: Sender<MessageWrapper>,
+    // ) -> Result<(String, RbotParseMode)> {
+    //     let tokens = text.split(' ').collect::<Vec<_>>();
+    //     let cmd_result: Box<dyn QbCommandAction> = match tokens.as_slice() {
+    //         ["/help"] => QHelp {}.boxed(),
+    //         ["/start"] => QStart {}.boxed(),
+    //         ["/list"] => QListAction::new().get_formatted(self).await?.boxed(),
+    //         [cmd @ ("/select" | "/pause" | "/resume"), id_str]
+    //             if id_str.parse::<usize>().is_ok() =>
+    //         {
+    //             self.select_command_with_id(cmd, id_str).await?
+    //         }
+    //         ["/download", link] => QDownloadAction::new(true, true, tg_tx)
+    //             .send_link(self, link)
+    //             .await?
+    //             .boxed(),
+    //         _ => UnknownCommand {}.boxed(),
+    //     };
 
-        // TODO: escape HTML and Markdown special chars
-        let prepared = match cmd_result.parse_mode() {
-            Some(rutebot::requests::ParseMode::Html) => {
-                format!("<pre>{}</pre>", cmd_result.action_result_to_string())
-            }
-            _ => cmd_result.action_result_to_string(),
-        };
+    //     // TODO: escape HTML and Markdown special chars
+    //     let prepared = match cmd_result.parse_mode() {
+    //         Some(rutebot::requests::ParseMode::Html) => {
+    //             format!("<pre>{}</pre>", cmd_result.action_result_to_string())
+    //         }
+    //         _ => cmd_result.action_result_to_string(),
+    //     };
 
-        // Telegram message size is limited by 4096 characters
-        let cut_msg: String = prepared.chars().take(4096).collect();
-        // TODO: split message by parts if it does not fit
+    //     // Telegram message size is limited by 4096 characters
+    //     let cut_msg: String = prepared.chars().take(4096).collect();
+    //     // TODO: split message by parts if it does not fit
 
-        Ok((cut_msg, cmd_result.parse_mode()))
-    }
+    //     Ok((cut_msg, cmd_result.parse_mode()))
+    // }
 }
