@@ -21,9 +21,3 @@ pub trait QbCommandAction {
         None
     }
 }
-
-pub trait BoxedCommand: QbCommandAction + Sized + 'static {
-    fn boxed(self) -> Box<dyn QbCommandAction> {
-        Box::new(self)
-    }
-}

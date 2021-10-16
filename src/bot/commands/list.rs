@@ -10,7 +10,7 @@ use serde_json::Value;
 
 use crate::bot::{commands::cmd_list::QbList, qb_client::QbClient, qbot::RbotParseMode};
 
-use super::{BoxedCommand, QbCommandAction};
+use super::QbCommandAction;
 
 pub struct QListAction {
     content: Option<String>,
@@ -106,5 +106,3 @@ impl QbCommandAction for QListAction {
         Some(ParseMode::Html)
     }
 }
-
-impl BoxedCommand for QListAction {}

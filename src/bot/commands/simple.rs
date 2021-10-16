@@ -2,7 +2,7 @@ use rutebot::requests::ParseMode;
 
 use crate::bot::qbot::RbotParseMode;
 
-use super::{BoxedCommand, QbCommandAction};
+use super::QbCommandAction;
 
 pub struct QHelp {}
 
@@ -17,8 +17,6 @@ impl QbCommandAction for QHelp {
     }
 }
 
-impl BoxedCommand for QHelp {}
-
 pub struct UnknownCommand {}
 
 impl QbCommandAction for UnknownCommand {
@@ -30,8 +28,6 @@ impl QbCommandAction for UnknownCommand {
         "Unknown command".to_string()
     }
 }
-
-impl BoxedCommand for UnknownCommand {}
 
 pub struct QStart {}
 
@@ -51,5 +47,3 @@ See the commands list using [/help](/help)."#
         Some(ParseMode::Markdown)
     }
 }
-
-impl BoxedCommand for QStart {}

@@ -5,7 +5,7 @@ use crate::bot::{
     qb_client::QbClient,
 };
 
-use super::{BoxedCommand, QbCommandAction};
+use super::QbCommandAction;
 use anyhow::{anyhow, Result};
 use tokio::time::sleep;
 
@@ -68,5 +68,3 @@ impl QbCommandAction for QResumeAction {
         if self.status { "OK" } else { "FAIL" }.to_string()
     }
 }
-
-impl BoxedCommand for QResumeAction {}
