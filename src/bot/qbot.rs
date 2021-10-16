@@ -35,11 +35,17 @@ impl QbitBot {
         let message = update.message?;
         let text = message.text?;
         let chat_id = message.chat.id;
-        let mut lock = self.chats.write().unwrap();
-        let chat = lock
-            .entry(chat_id)
-            .or_insert_with(|| QbChat::new(chat_id, self.rbot.clone(), self.qbclient.clone()));
-        chat.select_goto(&text).await;
-        Some(())
+        let username = message.from?.username?;
+        if self.qbclient.config.admins.contains(&username) {
+            let mut lock = self.chats.write().unwrap();
+            let chat = lock
+                .entry(chat_id)
+                .or_insert_with(|| QbChat::new(chat_id, self.rbot.clone(), self.qbclient.clone()));
+            chat.select_goto(&text).await;
+            Some(())
+        } else {
+            info!("User {} tried to chat with qbot but he does not have access", username);
+            None
+        }
     }
 }
