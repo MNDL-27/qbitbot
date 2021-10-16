@@ -5,10 +5,9 @@ use std::{
 
 use anyhow::Result;
 use chrono::{DateTime, Local};
-use rutebot::requests::ParseMode;
 use serde_json::Value;
 
-use crate::bot::{commands::cmd_list::QbList, qb_client::QbClient, qbot::RbotParseMode};
+use crate::bot::{commands::cmd_list::QbList, qb_client::QbClient};
 
 use super::QbCommandAction;
 
@@ -92,9 +91,5 @@ impl QbCommandAction for QListAction {
         self.content
             .clone()
             .map_or("Failed to get Qbittorrent response".to_string(), |x| x)
-    }
-
-    fn parse_mode(&self) -> RbotParseMode {
-        Some(ParseMode::Html)
     }
 }

@@ -9,8 +9,6 @@ use crate::bot::qb_chat::QbChat;
 
 use super::qb_client::QbClient;
 
-pub type RbotParseMode = Option<ParseMode>;
-
 #[derive(Debug)]
 pub struct MessageWrapper {
     pub text: String,
