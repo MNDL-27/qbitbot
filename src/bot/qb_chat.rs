@@ -18,9 +18,10 @@ use crate::bot::qb_client::QbClient;
 use crate::bot::qbot::MessageWrapper;
 
 use super::commands::download::QDownloadAction;
+use itertools::Itertools;
 
-#[derive(Clone, Debug)]
-enum MenuValue {
+#[derive(Clone, Debug, PartialOrd, Ord, Eq, PartialEq)]
+pub enum MenuValue {
     Main,
     Torrent,
     Help,
@@ -28,7 +29,7 @@ enum MenuValue {
     Download,
 }
 
-static COMMANDS: &[MenuValue] = &[Main, Torrent, Help, List, Download];
+pub static COMMANDS: &[MenuValue] = &[Main, Torrent, Help, List, Download];
 
 impl MenuValue {
     pub fn get_command(&self) -> &str {
@@ -38,6 +39,16 @@ impl MenuValue {
             Help => "/help",
             List => "/list",
             Download => "/download",
+        }
+    }
+
+    pub fn get_help(&self) -> &str {
+        match self {
+            Main => "Go to main menu",
+            Torrent => "blah blah",
+            Help => "Show help for all commands",
+            List => "List torrents",
+            Download => "Start downloading by link or attached file",
         }
     }
 
@@ -98,6 +109,7 @@ impl MenuTree {
     fn print_children(&self) -> String {
         self.children
             .iter()
+            .sorted()
             .map(|v| v.get_command())
             .collect::<Vec<_>>()
             .join("\n")
