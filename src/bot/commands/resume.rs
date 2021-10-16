@@ -60,10 +60,6 @@ impl QResumeAction {
 }
 
 impl QbCommandAction for QResumeAction {
-    fn name(&self) -> String {
-        "/resume".to_string()
-    }
-
     fn action_result_to_string(&self) -> String {
         if self.status { "OK" } else { "FAIL" }.to_string()
     }

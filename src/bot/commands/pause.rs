@@ -56,10 +56,6 @@ impl QPauseAction {
 }
 
 impl QbCommandAction for QPauseAction {
-    fn name(&self) -> String {
-        "/pause".to_string()
-    }
-
     fn action_result_to_string(&self) -> String {
         if self.status { "OK" } else { "FAIL" }.to_string()
     }

@@ -88,14 +88,6 @@ impl QListAction {
 }
 
 impl QbCommandAction for QListAction {
-    fn name(&self) -> String {
-        "/list".to_string()
-    }
-
-    fn description(&self) -> String {
-        "List all torrents".to_string()
-    }
-
     fn action_result_to_string(&self) -> String {
         self.content
             .clone()

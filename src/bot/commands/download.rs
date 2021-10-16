@@ -172,10 +172,6 @@ impl QDownloadAction {
 }
 
 impl QbCommandAction for QDownloadAction {
-    fn name(&self) -> String {
-        "/download".to_string()
-    }
-
     fn action_result_to_string(&self) -> String {
         if self.status { "OK" } else { "FAIL" }.to_string()
     }
