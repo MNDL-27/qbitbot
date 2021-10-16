@@ -6,7 +6,7 @@ use std::{
 use rutebot::{
     client::Rutebot,
     requests::ParseMode,
-    responses::{Update, User},
+    responses::Update,
 };
 
 use crate::bot::qb_chat::QbChat;
@@ -24,7 +24,7 @@ pub struct MessageWrapper {
 pub struct QbitBot {
     pub rbot: Rutebot,
     qbclient: Arc<QbClient>,
-    chats: RwLock<HashMap<i64, QbChat>>,
+    chats: Arc<RwLock<HashMap<i64, QbChat>>>,
 }
 
 impl QbitBot {
@@ -33,7 +33,7 @@ impl QbitBot {
         QbitBot {
             qbclient: Arc::new(QbClient::new().await),
             rbot,
-            chats: RwLock::new(HashMap::new()),
+            chats: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -45,7 +45,18 @@ impl QbitBot {
         let chat = lock.entry(chat_id).or_insert_with(|| {
             QbChat::new(chat_id, self.rbot.clone(), self.qbclient.clone())
         });
+        chat.process_notifies().await;
         chat.select_goto(&text).await;
         Some(())
+    }
+
+    pub async fn check_all_notifies(&self) {
+        let mut lock = self.chats.write().unwrap();
+        let futures = lock.iter_mut().map(|(_, chat)| {
+            chat.process_notifies()
+        });
+        for future in futures {
+            future.await
+        }
     }
 }

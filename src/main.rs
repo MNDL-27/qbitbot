@@ -34,5 +34,6 @@ async fn main() {
             }
             Err(err) => error!("{:#?}", err),
         };
+        qbot_arc.check_all_notifies().await;
     }
 }

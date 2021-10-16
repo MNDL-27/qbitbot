@@ -1,11 +1,17 @@
 use std::collections::HashSet;
+use std::ops::Deref;
+use std::sync::Arc;
+
+use anyhow::{anyhow, Result};
+use fure::backoff::fixed;
+use fure::policies::{attempts, backoff};
+use futures::FutureExt;
+use reqwest::Response;
+use tokio::time::Duration;
 
 use crate::bot::{qb_chat::NotifyClosure, qb_client::QbClient, qbot::MessageWrapper, TAG_NAME};
-use anyhow::{anyhow, Result};
-use reqwest::Response;
-use tokio::time::{sleep, Duration};
 
-use super::{cmd_list::QDownload, list::QListAction, BoxedCommand, QbCommandAction};
+use super::{cmd_list::QDownload, list::QListAction, QbCommandAction};
 
 pub struct QDownloadAction {
     status: bool,
@@ -13,6 +19,7 @@ pub struct QDownloadAction {
     notify: bool,
     torrent_hash: String,
     torrent_name: String,
+    pub checking_closure: Option<NotifyClosure>
 }
 
 enum CheckStatus {
@@ -28,6 +35,7 @@ impl QDownloadAction {
             notify,
             torrent_hash: "".to_string(),
             torrent_name: "".to_string(),
+            checking_closure: None,
         }
     }
 
@@ -35,21 +43,28 @@ impl QDownloadAction {
         &mut self,
         client: &QbClient,
         list_before: Option<HashSet<String>>,
-    ) -> bool {
+    ) -> Result<()> {
         if let Some(hashes) = list_before {
-            // give some time to start downloading
-            sleep(Duration::from_millis(1000)).await;
-            let list_after = Self::get_hashes(client).await.unwrap_or_default();
-            let diff: HashSet<String> = list_after.difference(&hashes).cloned().collect();
-            // TODO: fix this barely good check
-            if diff.len() == 1 {
-                self.torrent_hash = diff.iter().cloned().next().unwrap();
-                true
+            let closure = || async {
+                let list_after = Self::get_hashes(client).await.unwrap_or_default();
+                let diff: HashSet<String> = list_after.difference(&hashes).cloned().collect();
+                // TODO: fix this barely good check
+                if diff.len() == 1 {
+                    Ok(diff.iter().cloned().next().unwrap())
+                } else {
+                    Err(())
+                }
+            };
+            let policy = attempts(backoff(fixed(Duration::from_millis(500))), 3);
+            let res = fure::retry(closure, policy).await;
+            if let Ok(hash) = res {
+                self.torrent_hash = hash;
+                Ok(())
             } else {
-                false
+                Err(anyhow!("Torrent has not been added"))
             }
         } else {
-            false
+            Err(anyhow!("Failed to check added torrent"))
         }
     }
 
@@ -110,38 +125,47 @@ impl QDownloadAction {
         }
     }
 
-    async fn notify(client: &QbClient, hash: String, name: String) -> Result<MessageWrapper> {
-        let res = match Self::check_is_complete(&client, &hash).await {
-            CheckStatus::Done => Ok(MessageWrapper {
-                text: format!("{} is done", name),
-                parse_mode: None,
-            }),
-            CheckStatus::Fail => {
-                error!("Failed to get torrent status: {}", name);
-                Err(anyhow!("Failed to get torrent status"))
+    async fn notify(client: Arc<QbClient>, hash: String, name: String) -> Result<MessageWrapper> {
+        let closure = || async {
+            match Self::check_is_complete(&client, &hash).await {
+                CheckStatus::Done => Ok(MessageWrapper {
+                    text: format!("{} is done", name),
+                    parse_mode: None,
+                }),
+                CheckStatus::Fail => {
+                    Err(anyhow!("Failed to get torrent status"))
+                }
             }
         };
-        info!("Created notify loop for {}", name);
+        let policy = attempts(backoff(fixed(Duration::from_secs(3))), 3);
+        let retry = fure::retry(closure, policy);
+        let res= retry.await;
+        debug!("Checked {} for completion", name);
+        if res.is_err() {
+            error!("{:?} after 4 retries", res)
+        }
         res
     }
 
-    pub async fn send_link(mut self, client: & QbClient, link: &str) -> Result<Self> {
+    pub async fn send_link(mut self, arc_client: Arc<QbClient>, link: &str) -> Result<Self> {
+        let client = arc_client.deref();
         if self.validate {
             let list_before = Self::get_hashes(client).await;
             let send_resp = Self::inner_send(client, link).await?;
             self.status =
-                send_resp.status().is_success() && self.check_added(client, list_before).await;
+                send_resp.status().is_success() && self.check_added(client, list_before).await.is_ok();
             if self.status && self.notify {
                 self.torrent_name = Self::get_name(client, &self.torrent_hash)
                     .await
                     .ok_or_else(|| anyhow!("Failed to get torrent name"))?;
-                // let (hash, name) = (self.torrent_hash.clone(), self.torrent_name.clone());
-                // let a: NotifyClosure = Box::new(|| {
-                //     Box::pin(async {
-                //         Self::notify(client, hash, name)
-                //             .await
-                //     })
-                // });
+                let (r_hash, r_name) = (self.torrent_hash.clone(), self.torrent_name.clone());
+                let closure: NotifyClosure = Box::new(move |arc_client| {
+                    let (hash, name) = (r_hash.clone(), r_name.clone());
+                    async move {
+                        Self::notify(arc_client, hash, name).await
+                    }.boxed()
+                });
+                self.checking_closure = Some(closure);
             }
         } else {
             let send_resp = Self::inner_send(client, link).await?;
@@ -160,5 +184,3 @@ impl QbCommandAction for QDownloadAction {
         if self.status { "OK" } else { "FAIL" }.to_string()
     }
 }
-
-impl BoxedCommand for QDownloadAction {}

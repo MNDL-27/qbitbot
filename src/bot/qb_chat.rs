@@ -1,22 +1,21 @@
-use anyhow::Result;
-use futures_util::Future;
 use std::collections::HashMap;
-use std::pin::Pin;
+use std::ops::Deref;
 use std::sync::Arc;
 use std::time::Duration;
 
+use anyhow::Result;
 use fure::backoff::fixed;
 use fure::policies::{attempts, backoff};
+use futures_util::future::BoxFuture;
 use rutebot::client::Rutebot;
 use rutebot::requests::SendMessage;
 
 use crate::bot::commands::list::QListAction;
+use crate::bot::commands::QbCommandAction;
 use crate::bot::commands::simple::QHelp;
-use crate::bot::commands::BoxedCommand;
 use crate::bot::qb_chat::MenuValue::*;
 use crate::bot::qb_client::QbClient;
 use crate::bot::qbot::MessageWrapper;
-use std::ops::Deref;
 
 use super::commands::download::QDownloadAction;
 
@@ -105,7 +104,7 @@ impl MenuTree {
     }
 }
 
-pub type NotifyClosure = Box<dyn Fn() -> Pin<Box<dyn Future<Output = Result<MessageWrapper>> + Send>> + Send + Sync>;
+pub type NotifyClosure = Box<dyn Fn(Arc<QbClient>) -> BoxFuture<'static, Result<MessageWrapper>> + Send + Sync>;
 
 pub struct QbChat {
     chat_id: i64,
@@ -131,12 +130,11 @@ impl QbChat {
     async fn do_cmd(&self) -> String {
         match self.menu_pos.value {
             Main => "Main menu".to_string(),
-            Help => QHelp {}.boxed().action_result_to_string(),
+            Help => QHelp {}.action_result_to_string(),
             List => QListAction::new()
                 .get_formatted(self.qbclient.deref())
                 .await
                 .unwrap()
-                .boxed()
                 .action_result_to_string(),
             Download => "Send torrent link or attach torrent file".to_string(),
             _ => "No content".to_string(),
@@ -152,12 +150,14 @@ impl QbChat {
             }
             _ => match self.menu_pos.value {
                 Download => {
-                    let res = QDownloadAction::new(true, true)
-                        .send_link(self.qbclient.deref(), text)
+                    let download_obj = QDownloadAction::new(true, true)
+                        .send_link(self.qbclient.clone(), text)
                         .await
-                        .unwrap()
-                        .boxed()
-                        .action_result_to_string();
+                        .unwrap();
+                    let res = download_obj.action_result_to_string();
+                    if let Some(closure) = download_obj.checking_closure {
+                        self.notify_closures.push(closure);
+                    };
                     let message = MessageWrapper {
                         text: res,
                         parse_mode: Some(rutebot::requests::ParseMode::Html),
@@ -202,4 +202,16 @@ impl QbChat {
             error!("Failed to send reply 4 times")
         };
     }
+
+    pub async fn process_notifies(&mut self) {
+        let futures = self.notify_closures.iter().map(|closure| {
+            closure(self.qbclient.clone())
+        });
+        for future in futures {
+            if let Ok(msg) = future.await {
+                self.send_message(msg).await
+            }
+        }
+    }
+
 }
