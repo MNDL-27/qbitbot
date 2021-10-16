@@ -19,7 +19,7 @@ pub struct QDownloadAction {
     notify: bool,
     torrent_hash: String,
     torrent_name: String,
-    pub checking_closure: Option<NotifyClosure>
+    pub checking_closure: Option<NotifyClosure>,
 }
 
 enum CheckStatus {
@@ -132,14 +132,12 @@ impl QDownloadAction {
                     text: format!("{} is done", name),
                     parse_mode: None,
                 }),
-                CheckStatus::Fail => {
-                    Err(anyhow!("Failed to get torrent status"))
-                }
+                CheckStatus::Fail => Err(anyhow!("Failed to get torrent status")),
             }
         };
         let policy = attempts(backoff(fixed(Duration::from_secs(3))), 3);
         let retry = fure::retry(closure, policy);
-        let res= retry.await;
+        let res = retry.await;
         debug!("Checked {} for completion", name);
         if res.is_err() {
             error!("{:?} after 4 retries", res)
@@ -152,8 +150,8 @@ impl QDownloadAction {
         if self.validate {
             let list_before = Self::get_hashes(client).await;
             let send_resp = Self::inner_send(client, link).await?;
-            self.status =
-                send_resp.status().is_success() && self.check_added(client, list_before).await.is_ok();
+            self.status = send_resp.status().is_success()
+                && self.check_added(client, list_before).await.is_ok();
             if self.status && self.notify {
                 self.torrent_name = Self::get_name(client, &self.torrent_hash)
                     .await
@@ -161,9 +159,7 @@ impl QDownloadAction {
                 let (r_hash, r_name) = (self.torrent_hash.clone(), self.torrent_name.clone());
                 let closure: NotifyClosure = Box::new(move |arc_client| {
                     let (hash, name) = (r_hash.clone(), r_name.clone());
-                    async move {
-                        Self::notify(arc_client, hash, name).await
-                    }.boxed()
+                    async move { Self::notify(arc_client, hash, name).await }.boxed()
                 });
                 self.checking_closure = Some(closure);
             }

@@ -3,11 +3,7 @@ use std::{
     sync::{Arc, RwLock},
 };
 
-use rutebot::{
-    client::Rutebot,
-    requests::ParseMode,
-    responses::Update,
-};
+use rutebot::{client::Rutebot, requests::ParseMode, responses::Update};
 
 use crate::bot::qb_chat::QbChat;
 
@@ -42,9 +38,9 @@ impl QbitBot {
         let text = message.text?;
         let chat_id = message.chat.id;
         let mut lock = self.chats.write().unwrap();
-        let chat = lock.entry(chat_id).or_insert_with(|| {
-            QbChat::new(chat_id, self.rbot.clone(), self.qbclient.clone())
-        });
+        let chat = lock
+            .entry(chat_id)
+            .or_insert_with(|| QbChat::new(chat_id, self.rbot.clone(), self.qbclient.clone()));
         chat.process_notifies().await;
         chat.select_goto(&text).await;
         Some(())
@@ -52,9 +48,7 @@ impl QbitBot {
 
     pub async fn check_all_notifies(&self) {
         let mut lock = self.chats.write().unwrap();
-        let futures = lock.iter_mut().map(|(_, chat)| {
-            chat.process_notifies()
-        });
+        let futures = lock.iter_mut().map(|(_, chat)| chat.process_notifies());
         for future in futures {
             future.await
         }
