@@ -215,15 +215,20 @@ impl QbChat {
         };
     }
 
-    pub async fn process_notifies(&mut self) {
+    pub async fn process_notifies(&self) {
+        debug!("Processing notifies for chat {}", self.chat_id);
         let futures = self.notify_closures.iter().map(|closure| {
             closure(self.qbclient.clone())
         });
         for future in futures {
-            if let Ok(msg) = future.await {
+            let res = future.await;
+            if let Ok(msg) = res {
                 self.send_message(msg).await
+            } else {
+                error!("{:?}", res)
             }
         }
+        debug!("Processing notifies for chat {} is done", self.chat_id);
     }
 
 }

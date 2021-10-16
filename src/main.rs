@@ -23,6 +23,7 @@ async fn main() {
         .parse_filters(get_loglevel().as_str())
         .init();
     let qbot = QbitBot::new().await;
+    // qbot.create_notify_checker();
     info!("QbitBot launched");
     let mut updates_stream = Box::pin(qbot.rbot.incoming_updates(None, None));
     let qbot_arc = Arc::new(qbot);
@@ -37,6 +38,5 @@ async fn main() {
             }
             Err(err) => error!("{:#?}", err),
         };
-        qbot_arc.check_all_notifies().await;
     }
 }

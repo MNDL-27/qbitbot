@@ -24,6 +24,7 @@ pub struct QDownloadAction {
 
 enum CheckStatus {
     Done,
+    InProgress,
     Fail,
 }
 
@@ -115,7 +116,7 @@ impl QDownloadAction {
                 if completion_date != -1 {
                     CheckStatus::Done
                 } else {
-                    CheckStatus::Fail
+                    CheckStatus::InProgress
                 }
             } else {
                 CheckStatus::Fail
@@ -126,22 +127,15 @@ impl QDownloadAction {
     }
 
     async fn notify(client: Arc<QbClient>, hash: String, name: String) -> Result<MessageWrapper> {
-        let closure = || async {
-            match Self::check_is_complete(&client, &hash).await {
-                CheckStatus::Done => Ok(MessageWrapper {
-                    text: format!("{} is done", name),
-                    parse_mode: None,
-                }),
-                CheckStatus::Fail => Err(anyhow!("Failed to get torrent status")),
-            }
+        let res = match Self::check_is_complete(&client, &hash).await {
+            CheckStatus::Done => Ok(MessageWrapper {
+                text: format!("{} is done", name),
+                parse_mode: None,
+            }),
+            CheckStatus::Fail => Err(anyhow!("Failed to get torrent status")),
+            CheckStatus::InProgress => Err(anyhow!("Torrent in progress")),
         };
-        let policy = attempts(backoff(fixed(Duration::from_secs(3))), 3);
-        let retry = fure::retry(closure, policy);
-        let res = retry.await;
         debug!("Checked {} for completion", name);
-        if res.is_err() {
-            error!("{:?} after 4 retries", res)
-        }
         res
     }
 
