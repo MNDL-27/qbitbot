@@ -24,19 +24,17 @@ use super::notifier::Notifier;
 #[derive(Clone, Debug, PartialOrd, Ord, Eq, PartialEq)]
 pub enum MenuValue {
     Main,
-    Torrent,
     Help,
     List,
     Download,
 }
 
-pub static COMMANDS: &[MenuValue] = &[Main, Torrent, Help, List, Download];
+pub static COMMANDS: &[MenuValue] = &[Main, Help, List, Download];
 
 impl MenuValue {
     pub fn get_command(&self) -> &str {
         match self {
             Main => "/main",
-            Torrent => "/torrent",
             Help => "/help",
             List => "/list",
             Download => "/download",
@@ -46,7 +44,6 @@ impl MenuValue {
     pub fn get_help(&self) -> &str {
         match self {
             Main => "Go to main menu",
-            Torrent => "blah blah",
             Help => "Show help for all commands",
             List => "List torrents",
             Download => "Start downloading by link or attached file",
@@ -75,16 +72,12 @@ impl From<MenuValue> for MenuTree {
             Main => MenuTree {
                 value,
                 parent: None,
-                children: vec![Torrent, Help, List, Download],
+                children: vec![Help, List, Download],
             },
             Help => MenuTree {
                 value,
                 parent: Some(Main),
                 children: vec![],
-            },
-            Torrent => MenuTree {
-                value,
-                ..MenuTree::from(Help)
             },
             List => MenuTree {
                 value,
@@ -151,7 +144,6 @@ impl QbChat {
                 .unwrap()
                 .action_result_to_string(),
             Download => "Send torrent link or attach torrent file".to_string(),
-            _ => "No content".to_string(),
         }
     }
 
@@ -162,6 +154,14 @@ impl QbChat {
                 self.goto(self.commands_map.get(command).unwrap().to_owned())
                     .await
             }
+            _ if text.starts_with("/torrent") => {
+                if let Ok(id) = text.strip_prefix("/torrent").unwrap().parse::<usize>() {
+                    todo!()
+                } else {
+                    todo!()
+                    // "FAIL".to_string()
+                }
+            },
             _ => match self.menu_pos.value {
                 Download => {
                     let download_obj = QDownloadAction::new()
