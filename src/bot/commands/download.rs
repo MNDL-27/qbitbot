@@ -5,38 +5,28 @@ use std::sync::Arc;
 use anyhow::{anyhow, Result};
 use fure::backoff::fixed;
 use fure::policies::{attempts, backoff};
-use futures::FutureExt;
 use reqwest::Response;
-use tokio::time::Duration;
+use tokio::sync::mpsc::Sender;
+use tokio::time::{Duration, sleep};
 
-use crate::bot::{qb_chat::NotifyClosure, qb_client::QbClient, qbot::MessageWrapper, TAG_NAME};
+use crate::bot::{qb_client::QbClient, TAG_NAME};
+use crate::bot::notifier::CheckType;
+use crate::bot::notifier::CheckType::Completed;
 
 use super::{cmd_list::QDownload, list::QListAction, QbCommandAction};
 
 pub struct QDownloadAction {
     status: bool,
-    validate: bool,
-    notify: bool,
     torrent_hash: String,
     torrent_name: String,
-    pub checking_closure: Option<NotifyClosure>,
-}
-
-enum CheckStatus {
-    Done,
-    InProgress,
-    Fail,
 }
 
 impl QDownloadAction {
-    pub fn new(validate: bool, notify: bool) -> Self {
+    pub fn new() -> Self {
         QDownloadAction {
             status: false,
-            validate,
-            notify,
             torrent_hash: "".to_string(),
             torrent_name: "".to_string(),
-            checking_closure: None,
         }
     }
 
@@ -106,61 +96,54 @@ impl QDownloadAction {
         Some(name)
     }
 
-    async fn check_is_complete(client: &QbClient, hash: &str) -> CheckStatus {
-        if let Ok(props) = client.get_properties(hash.to_string()).await {
+    async fn check_is_completed(client: &QbClient, hash: &str, name: &str) -> Result<String> {
+        let res = if let Ok(props) = client.get_properties(hash.to_string()).await {
             let completion_date_opt = move || -> Option<i64> {
                 let obj = props.as_object()?;
                 obj.get("completion_date")?.as_i64()
             }();
             if let Some(completion_date) = completion_date_opt {
                 if completion_date != -1 {
-                    CheckStatus::Done
+                    Ok(format!("{} is done", name))
                 } else {
-                    CheckStatus::InProgress
+                    Err(anyhow!("Torrent in progress"))
                 }
             } else {
-                CheckStatus::Fail
+                Err(anyhow!("Failed to get torrent status"))
             }
         } else {
-            CheckStatus::Fail
-        }
-    }
-
-    async fn notify(client: Arc<QbClient>, hash: String, name: String) -> Result<MessageWrapper> {
-        let res = match Self::check_is_complete(&client, &hash).await {
-            CheckStatus::Done => Ok(MessageWrapper {
-                text: format!("{} is done", name),
-                parse_mode: None,
-            }),
-            CheckStatus::Fail => Err(anyhow!("Failed to get torrent status")),
-            CheckStatus::InProgress => Err(anyhow!("Torrent in progress")),
+            Err(anyhow!("Failed to get torrent status"))
         };
         debug!("Checked {} for completion", name);
         res
     }
 
+    pub async fn create_notifier(&self, client: Arc<QbClient>, tx: Sender<CheckType>) {
+        let hash = self.torrent_hash.clone();
+        if self.status {
+            let res = Self::get_name(&client, &hash).await;
+            if let Some(name) = res {
+                tokio::spawn(async move {
+                    while Self::check_is_completed(&client, &hash, &name).await.is_err() {
+                        sleep(Duration::from_secs(1)).await;
+                        debug!("Checked {} for completion", name)
+                    };
+                    if tx.send(Completed(name)).await.is_err() {
+                        error!("Failed to send 'completed' status into channel")
+                    }
+                });
+            } else {
+                error!("Failed to get torrent name");
+            }
+        }
+    }
+
     pub async fn send_link(mut self, arc_client: Arc<QbClient>, link: &str) -> Result<Self> {
         let client = arc_client.deref();
-        if self.validate {
-            let list_before = Self::get_hashes(client).await;
-            let send_resp = Self::inner_send(client, link).await?;
-            self.status = send_resp.status().is_success()
-                && self.check_added(client, list_before).await.is_ok();
-            if self.status && self.notify {
-                self.torrent_name = Self::get_name(client, &self.torrent_hash)
-                    .await
-                    .ok_or_else(|| anyhow!("Failed to get torrent name"))?;
-                let (r_hash, r_name) = (self.torrent_hash.clone(), self.torrent_name.clone());
-                let closure: NotifyClosure = Box::new(move |arc_client| {
-                    let (hash, name) = (r_hash.clone(), r_name.clone());
-                    async move { Self::notify(arc_client, hash, name).await }.boxed()
-                });
-                self.checking_closure = Some(closure);
-            }
-        } else {
-            let send_resp = Self::inner_send(client, link).await?;
-            self.status = send_resp.status().is_success();
-        };
+        let list_before = Self::get_hashes(client).await;
+        let send_resp = Self::inner_send(client, link).await?;
+        self.status =
+            send_resp.status().is_success() && self.check_added(client, list_before).await.is_ok();
         Ok(self)
     }
 }

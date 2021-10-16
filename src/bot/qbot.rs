@@ -8,8 +8,6 @@ use rutebot::{client::Rutebot, requests::ParseMode, responses::Update};
 use crate::bot::qb_chat::QbChat;
 
 use super::qb_client::QbClient;
-use std::time::Duration;
-use tokio::time::sleep;
 
 pub type RbotParseMode = Option<ParseMode>;
 
@@ -43,25 +41,7 @@ impl QbitBot {
         let chat = lock
             .entry(chat_id)
             .or_insert_with(|| QbChat::new(chat_id, self.rbot.clone(), self.qbclient.clone()));
-        chat.process_notifies().await;
         chat.select_goto(&text).await;
         Some(())
     }
-
-    // pub fn create_notify_checker(&'static self) {
-    //     tokio::spawn(async {
-    //         loop {
-    //             let futures = {
-    //                 let lock = self.chats.read().unwrap();
-    //                 lock.iter().map(|(_, chat)| chat.process_notifies())
-    //             };
-    //             debug!("Starting processing of all notifies");
-    //             for future in futures {
-    //                 future.await
-    //             }
-    //             debug!("Processing of all notifies is done");
-    //             sleep(Duration::from_secs(3)).await;
-    //         }
-    //     });
-    // }
 }
