@@ -11,8 +11,10 @@ use rutebot::requests::SendMessage;
 use tokio::sync::mpsc::Sender;
 
 use crate::bot::commands::list::QListAction;
-use crate::bot::commands::simple::QHelp;
+use crate::bot::commands::pause::QPauseAction;
 use crate::bot::commands::QbCommandAction;
+use crate::bot::commands::resume::QResumeAction;
+use crate::bot::commands::simple::QHelp;
 use crate::bot::notifier::CheckType;
 use crate::bot::qb_chat::MenuValue::*;
 use crate::bot::qb_client::QbClient;
@@ -27,6 +29,9 @@ pub enum MenuValue {
     Help,
     List,
     Download,
+    TorrentPage(usize),
+    Pause,
+    Resume,
 }
 
 pub static COMMANDS: &[MenuValue] = &[Main, Help, List, Download];
@@ -38,6 +43,9 @@ impl MenuValue {
             Help => "/help",
             List => "/list",
             Download => "/download",
+            TorrentPage(_) => "/torrent",
+            Pause => "/pause",
+            Resume => "/resume,",
         }
     }
 
@@ -47,6 +55,8 @@ impl MenuValue {
             Help => "Show help for all commands",
             List => "List torrents",
             Download => "Start downloading by link or attached file",
+            TorrentPage(_) => "Show torrent page",
+            _ => "",
         }
     }
 
@@ -86,6 +96,19 @@ impl From<MenuValue> for MenuTree {
             Download => MenuTree {
                 value,
                 ..MenuTree::from(Help)
+            },
+            TorrentPage(_) => MenuTree {
+                value,
+                parent: Some(List),
+                children: vec![Pause, Resume],
+            },
+            Pause => MenuTree {
+                value,
+                ..MenuTree::from(Pause)
+            },
+            Resume => MenuTree {
+                value,
+                ..MenuTree::from(Resume)
             },
         }
     }
@@ -144,6 +167,8 @@ impl QbChat {
                 .unwrap()
                 .action_result_to_string(),
             Download => "Send torrent link or attach torrent file".to_string(),
+            TorrentPage(_) => "Torrent management".to_string(),
+            _ => "You will never see this message".to_string(),
         }
     }
 
@@ -156,12 +181,33 @@ impl QbChat {
             }
             _ if text.starts_with("/torrent") => {
                 if let Ok(id) = text.strip_prefix("/torrent").unwrap().parse::<usize>() {
-                    todo!()
+                    self.goto(TorrentPage(id)).await
                 } else {
-                    todo!()
-                    // "FAIL".to_string()
+                    self.goto(self.menu_pos.value.clone()).await
                 }
-            },
+            }
+            cmd @ ("/pause" | "/resume") if matches!(self.menu_pos.value, TorrentPage(_)) => {
+                let res = if let TorrentPage(id) = self.menu_pos.value {
+                    if cmd == "/pause" {
+                        QPauseAction::new()
+                            .act(self.qbclient.clone(), id)
+                            .await
+                            .action_result_to_string()
+                    } else {
+                        QResumeAction::new()
+                            .act(self.qbclient.clone(), id)
+                            .await
+                            .action_result_to_string()
+                    }
+                } else {
+                    String::from("")
+                };
+                let message = MessageWrapper {
+                    text: res,
+                    parse_mode: None,
+                };
+                self.send_message(message).await
+            }
             _ => match self.menu_pos.value {
                 Download => {
                     let download_obj = QDownloadAction::new()
