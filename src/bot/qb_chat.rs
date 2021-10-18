@@ -167,11 +167,11 @@ impl QbChat {
                 .action_result_to_string(),
             Download => "Send torrent link or attach torrent file".to_string(),
             TorrentPage(id) => {
-                // TODO: fix unwrap
-                let hash = QListAction::id_to_hash(&self.qbclient, id).await.unwrap();
-                let name = QDownloadAction::get_name(&self.qbclient, &hash).await.unwrap();
+                let name = QListAction::get_name_by_id(&self.qbclient, id)
+                    .await
+                    .unwrap_or_else(|| "Failed to get name".to_string());
                 format!("Torrent management: {}", name)
-            },
+            }
             _ => "You will never see this message".to_string(),
         }
     }
