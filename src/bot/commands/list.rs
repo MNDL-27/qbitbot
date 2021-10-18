@@ -83,7 +83,7 @@ impl QListAction {
                 .filter_map(|(num, item)| {
                     let progress = item.get("progress").unwrap().as_f64()? * 100.0;
                     Some(format!(
-                        "{num:2} | {name:20} | {size:6} Mb | {progress:3}% | {eta:19}\n",
+                        "/torrent{num} | {name:20} | {size:6} Mb | {progress:3}% | {eta:19}</code>\n",
                         num = num,
                         name = Self::get_name(item)?,
                         size = item.get("size")?.as_u64()? / 1048576,
@@ -100,9 +100,8 @@ impl QListAction {
 
 impl QbCommandAction for QListAction {
     fn action_result_to_string(&self) -> String {
-        let raw = self.content
+        self.content
             .clone()
-            .map_or("Failed to get Qbittorrent response".to_string(), |x| x);
-        format!("<code>{}</code>", raw)
+            .map_or("Failed to get Qbittorrent response".to_string(), |x| x)
     }
 }

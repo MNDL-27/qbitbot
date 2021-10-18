@@ -18,7 +18,6 @@ use super::{cmd_list::QDownload, list::QListAction, QbCommandAction};
 pub struct QDownloadAction {
     status: bool,
     torrent_hash: String,
-    torrent_name: String,
 }
 
 impl QDownloadAction {
@@ -26,7 +25,6 @@ impl QDownloadAction {
         QDownloadAction {
             status: false,
             torrent_hash: "".to_string(),
-            torrent_name: "".to_string(),
         }
     }
 
