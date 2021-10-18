@@ -126,7 +126,6 @@ impl QDownloadAction {
                 tokio::spawn(async move {
                     while Self::check_is_completed(&client, &hash, &name).await.is_err() {
                         sleep(Duration::from_secs(1)).await;
-                        debug!("Checked {} for completion", name)
                     };
                     if tx.send(Completed(name)).await.is_err() {
                         error!("Failed to send 'completed' status into channel")

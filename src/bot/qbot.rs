@@ -44,7 +44,10 @@ impl QbitBot {
             chat.select_goto(&text).await;
             Some(())
         } else {
-            info!("User {} tried to chat with qbot but he does not have access", username);
+            info!(
+                "User {} tried to chat with qbot but he does not have access",
+                username
+            );
             None
         }
     }

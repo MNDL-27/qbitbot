@@ -11,10 +11,9 @@ use rutebot::requests::SendMessage;
 use tokio::sync::mpsc::Sender;
 
 use crate::bot::commands::list::QListAction;
-use crate::bot::commands::pause::QPauseAction;
-use crate::bot::commands::QbCommandAction;
-use crate::bot::commands::resume::QResumeAction;
+use crate::bot::commands::pause_resume::QPauseResumeAction;
 use crate::bot::commands::simple::QHelp;
+use crate::bot::commands::QbCommandAction;
 use crate::bot::notifier::CheckType;
 use crate::bot::qb_chat::MenuValue::*;
 use crate::bot::qb_client::QbClient;
@@ -188,18 +187,12 @@ impl QbChat {
             }
             cmd @ ("/pause" | "/resume") if matches!(self.menu_pos.value, TorrentPage(_)) => {
                 let res = if let TorrentPage(id) = self.menu_pos.value {
-                    if cmd == "/pause" {
-                        QPauseAction::new()
-                            .act(self.qbclient.clone(), id)
-                            .await
-                            .action_result_to_string()
-                    } else {
-                        QResumeAction::new()
-                            .act(self.qbclient.clone(), id)
-                            .await
-                            .action_result_to_string()
-                    }
+                    QPauseResumeAction::new(cmd.strip_prefix('/').unwrap())
+                        .act(self.qbclient.clone(), id)
+                        .await
+                        .action_result_to_string()
                 } else {
+                    // dummy code to complete if let else
                     String::from("")
                 };
                 let message = MessageWrapper {
