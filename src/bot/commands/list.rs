@@ -100,8 +100,9 @@ impl QListAction {
 
 impl QbCommandAction for QListAction {
     fn action_result_to_string(&self) -> String {
-        self.content
+        let raw = self.content
             .clone()
-            .map_or("Failed to get Qbittorrent response".to_string(), |x| x)
+            .map_or("Failed to get Qbittorrent response".to_string(), |x| x);
+        format!("<code>{}</code>", raw)
     }
 }
