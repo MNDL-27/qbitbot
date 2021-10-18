@@ -83,7 +83,7 @@ impl QListAction {
                 .filter_map(|(num, item)| {
                     let progress = item.get("progress").unwrap().as_f64()? * 100.0;
                     Some(format!(
-                        "/torrent{num} | {name:20} | {size:6} Mb | {progress:3}% | {eta:19}</code>\n",
+                        "/torrent{num}<code> | {name:20} | {size:6} Mb | {progress:3}% | {eta:19}</code>\n",
                         num = num,
                         name = Self::get_name(item)?,
                         size = item.get("size")?.as_u64()? / 1048576,
