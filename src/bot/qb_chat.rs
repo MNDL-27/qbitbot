@@ -161,8 +161,7 @@ impl QbChat {
         match self.menu_pos.value {
             Main => "Main menu".to_string(),
             Help => QHelp {}.action_result_to_string(),
-            List => QListAction::new()
-                .get_formatted(self.qbclient.deref())
+            List => QListAction::new(self.qbclient.deref())
                 .await
                 .unwrap()
                 .action_result_to_string(),
@@ -191,7 +190,7 @@ impl QbChat {
                     self.goto(self.menu_pos.value.clone()).await
                 }
             }
-            cmd @ ("/pause" | "/resume") if matches!(self.menu_pos.value, TorrentPage(id)) => {
+            cmd @ ("/pause" | "/resume") if matches!(self.menu_pos.value, TorrentPage(_)) => {
                 let res = if let TorrentPage(id) = self.menu_pos.value {
                     QPauseResumeAction::new(cmd.strip_prefix('/').unwrap())
                         .act(self.qbclient.clone(), id)

@@ -24,7 +24,7 @@ pub struct QDownload {
 
 #[derive(Serialize)]
 pub struct QGetProperties {
-    pub hash: String
+    pub hash: String,
 }
 
 #[derive(Serialize)]
@@ -35,4 +35,15 @@ pub struct QPause {
 #[derive(Serialize)]
 pub struct QResume {
     pub hashes: String,
+}
+
+#[derive(Serialize, Debug, Clone)]
+pub struct MaindataResponse {
+    pub rid: usize,
+}
+
+impl Default for MaindataResponse {
+    fn default() -> Self {
+        Self { rid: 0 }
+    }
 }

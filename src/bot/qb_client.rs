@@ -2,8 +2,8 @@ use std::time::Duration;
 
 use anyhow::{anyhow, Context, Result};
 use reqwest::{
-    header::{HeaderMap, ORIGIN},
-    Client, Response,
+    Client,
+    header::{HeaderMap, ORIGIN}, Response,
 };
 use serde::Serialize;
 use serde_json::Value;
@@ -11,7 +11,10 @@ use serde_json::Value;
 use crate::bot::commands::cmd_list::QGetProperties;
 
 use super::{
-    commands::cmd_list::{Login, QTag},
+    commands::{
+        cmd_list::{Login, QTag},
+        list::QListAction,
+    },
     config::QbConfig,
     TAG_NAME,
 };
@@ -20,6 +23,7 @@ use super::{
 pub struct QbClient {
     pub config: QbConfig,
     client: Client,
+    cached_list: Option<QListAction>,
 }
 
 impl QbClient {
@@ -28,6 +32,7 @@ impl QbClient {
         let headers = Self::gen_headers(config.location.clone());
         let qbclient = QbClient {
             client: Self::build_client(headers),
+            cached_list: None,
             config,
         };
         qbclient.login().await.unwrap();
@@ -95,6 +100,18 @@ impl QbClient {
         Ok(())
     }
 
+    pub async fn get_cached_list(&mut self) -> Result<QListAction> {
+        if self.cached_list.is_some() {
+            let mut cached_list = self.cached_list.to_owned().unwrap();
+            cached_list.check_and_update(&self).await?;
+            Ok(cached_list)
+        } else {
+            let cached_list = QListAction::new(&self).await?;
+            self.cached_list = Some(cached_list.to_owned());
+            Ok(cached_list)
+        }
+    }
+    // TODO: move this to appropriate module
     pub async fn get_properties(&self, hash: String) -> Result<Value> {
         let value = self
             .qpost("/torrents/properties", QGetProperties { hash })

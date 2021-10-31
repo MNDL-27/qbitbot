@@ -8,7 +8,8 @@ use fure::policies::{attempts, backoff};
 use serde_json::Value;
 
 use crate::bot::commands::aux::id_to_hash;
-use crate::bot::{commands::list::QListAction, qb_client::QbClient};
+use crate::bot::commands::list::QListAction;
+use crate::bot::qb_client::QbClient;
 
 use super::{cmd_list::QPause, QbCommandAction};
 
@@ -65,7 +66,7 @@ impl QPauseResumeAction {
             Some(state)
         };
         let get_and_check_state = || async {
-            let items = QListAction::new().get(client).await?;
+            let items = QListAction::get(client).await?;
             let state =
                 parse_and_check_state(items).ok_or_else(|| anyhow!("Failed to parse state"))?;
             self.check(&state)
