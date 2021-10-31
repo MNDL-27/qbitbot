@@ -39,7 +39,7 @@ pub struct QResume {
 
 #[derive(Serialize, Debug, Clone)]
 pub struct MaindataResponse {
-    pub rid: usize,
+    pub rid: i64,
 }
 
 impl Default for MaindataResponse {

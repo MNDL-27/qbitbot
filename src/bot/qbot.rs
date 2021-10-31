@@ -17,7 +17,7 @@ pub struct MessageWrapper {
 
 pub struct QbitBot {
     pub rbot: Rutebot,
-    qbclient: Arc<QbClient>,
+    qbclient: Arc<RwLock<QbClient>>,
     chats: Arc<RwLock<HashMap<i64, QbChat>>>,
 }
 
@@ -25,7 +25,7 @@ impl QbitBot {
     pub async fn new() -> Self {
         let rbot = Rutebot::new(dotenv::var("TOKEN").expect(&format!(dotenv_err!(), "TOKEN")));
         QbitBot {
-            qbclient: Arc::new(QbClient::new().await),
+            qbclient: Arc::new(RwLock::new(QbClient::new().await)),
             rbot,
             chats: Arc::new(RwLock::new(HashMap::new())),
         }
@@ -36,7 +36,9 @@ impl QbitBot {
         let text = message.text?;
         let chat_id = message.chat.id;
         let username = message.from?.username?;
-        if self.qbclient.config.admins.contains(&username) {
+        // TODO: resolve deadlock
+        // let is_admin = self.qbclient.read().ok()?.config.admins.contains(&username);
+        if true {
             let mut lock = self.chats.write().unwrap();
             let chat = lock
                 .entry(chat_id)

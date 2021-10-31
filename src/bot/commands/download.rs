@@ -115,13 +115,14 @@ impl QDownloadAction {
         res
     }
 
-    pub async fn create_notifier(&self, client: Arc<QbClient>, tx: Sender<CheckType>) {
+    pub async fn create_notifier(&self, client: &QbClient, tx: Sender<CheckType>) {
         let hash = self.torrent_hash.clone();
         if self.status {
             let res = Self::get_name(&client, &hash).await;
             if let Some(name) = res {
+                let my_client = client.clone();
                 tokio::spawn(async move {
-                    while Self::check_is_completed(&client, &hash, &name).await.is_err() {
+                    while Self::check_is_completed(&my_client, &hash, &name).await.is_err() {
                         sleep(Duration::from_secs(1)).await;
                     };
                     if tx.send(Completed(name)).await.is_err() {
@@ -134,8 +135,7 @@ impl QDownloadAction {
         }
     }
 
-    pub async fn send_link(mut self, arc_client: Arc<QbClient>, link: &str) -> Result<Self> {
-        let client = arc_client.deref();
+    pub async fn send_link(mut self, client: &QbClient, link: &str) -> Result<Self> {
         let list_before = Self::get_hashes(client).await;
         let send_resp = Self::inner_send(client, link).await?;
         self.status =

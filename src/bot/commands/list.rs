@@ -44,7 +44,7 @@ impl QListAction {
     }
 
     pub async fn check_and_update(&mut self, client: &QbClient) -> Result<()> {
-        let resp = self.check_has_changes(client).await?;
+        self.check_has_changes(client).await?;
         self.records = Self::update_records(client).await?;
         Ok(())
     }
@@ -63,13 +63,28 @@ impl QListAction {
         }
     }
 
-    async fn check_has_changes(&self, client: &QbClient) -> Result<Value> {
-        let resp = client
-            .qpost("/api/v2/sync/maindata", self.maindata_response.to_owned())
+    // TODO: fix function to differentiate "Error" because Qb failed and "Torrent has not been changed"
+    async fn check_has_changes(&mut self, client: &QbClient) -> Result<Value> {
+        let resp: Value = client
+            .qpost("/sync/maindata", self.maindata_response.to_owned())
             .await?
             .json()
             .await?;
-        dbg!(&resp);
+
+        self.maindata_response.rid = (|| -> Option<i64> {
+            let res = resp.as_object()?.get("rid")?.as_i64()?;
+            Some(res)
+        })().ok_or_else(|| anyhow!("Failed to parse Qbittorrent response"))?;
+
+        (|| -> Option<()> {
+            let updated = resp.as_object()?.get("full_update")?.as_bool()?;
+            if !updated {
+                Some(())
+            } else {
+                None
+            }
+        })().ok_or_else(|| anyhow!("Failed to parse Qbittorrent response"))?;
+
         Ok(resp)
     }
 }

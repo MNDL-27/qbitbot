@@ -75,8 +75,7 @@ impl QPauseResumeAction {
         fure::retry(get_and_check_state, policy).await
     }
 
-    pub async fn act(mut self, arc_client: Arc<QbClient>, id: usize) -> Self {
-        let client = arc_client.deref();
+    pub async fn act(mut self, client: &QbClient, id: usize) -> Self {
         let hash_opt = id_to_hash(client, id).await;
         if hash_opt.is_none() {
             self.status = Err(anyhow!("ID to hash conversion failed"));
