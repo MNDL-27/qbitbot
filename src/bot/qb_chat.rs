@@ -21,6 +21,7 @@ use crate::bot::qbot::MessageWrapper;
 
 use super::commands::download::QDownloadAction;
 use super::notifier::Notifier;
+use crate::bot::commands::aux::get_name_by_id;
 
 #[derive(Clone, Debug, PartialOrd, Ord, Eq, PartialEq)]
 pub enum MenuValue {
@@ -167,7 +168,7 @@ impl QbChat {
                 .action_result_to_string(),
             Download => "Send torrent link or attach torrent file".to_string(),
             TorrentPage(id) => {
-                let name = QListAction::get_name_by_id(&self.qbclient, id)
+                let name = get_name_by_id(&self.qbclient, id)
                     .await
                     .unwrap_or_else(|| "Failed to get name".to_string());
                 format!("Torrent management: {}", name)

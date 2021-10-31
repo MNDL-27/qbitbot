@@ -7,6 +7,7 @@ use fure::backoff::fixed;
 use fure::policies::{attempts, backoff};
 use serde_json::Value;
 
+use crate::bot::commands::aux::id_to_hash;
 use crate::bot::{commands::list::QListAction, qb_client::QbClient};
 
 use super::{cmd_list::QPause, QbCommandAction};
@@ -75,7 +76,7 @@ impl QPauseResumeAction {
 
     pub async fn act(mut self, arc_client: Arc<QbClient>, id: usize) -> Self {
         let client = arc_client.deref();
-        let hash_opt = QListAction::id_to_hash(client, id).await;
+        let hash_opt = id_to_hash(client, id).await;
         if hash_opt.is_none() {
             self.status = Err(anyhow!("ID to hash conversion failed"));
             return self;

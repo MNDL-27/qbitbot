@@ -10,7 +10,6 @@ use serde_json::Value;
 use crate::bot::{commands::cmd_list::QbList, qb_client::QbClient};
 
 use super::QbCommandAction;
-use crate::bot::commands::download::QDownloadAction;
 
 pub struct QListAction {
     content: Option<String>,
@@ -46,24 +45,6 @@ impl QListAction {
             }
         };
         Some(humanized_eta)
-    }
-
-    pub async fn id_to_hash(client: &QbClient, id: usize) -> Option<String> {
-        let array = QListAction::new()
-            .get(client)
-            .await
-            .ok()?
-            .as_array()?
-            .to_owned();
-        let (_, item) = array.iter().enumerate().nth(id)?;
-        let hash = item.as_object()?.get("hash")?.as_str()?.to_string();
-        Some(hash)
-    }
-
-    // TODO: move related functions in separate module
-    pub async fn get_name_by_id(client: &QbClient, id: usize) -> Option<String> {
-        let hash = Self::id_to_hash(client, id).await?;
-        QDownloadAction::get_name(client, &hash).await
     }
 
     pub async fn get(&self, client: &QbClient) -> Result<Value> {
