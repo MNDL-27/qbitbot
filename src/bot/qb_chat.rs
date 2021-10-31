@@ -10,10 +10,11 @@ use rutebot::client::Rutebot;
 use rutebot::requests::SendMessage;
 use tokio::sync::mpsc::Sender;
 
+use crate::bot::commands::aux::get_name_by_id;
 use crate::bot::commands::list::QListAction;
 use crate::bot::commands::pause_resume::QPauseResumeAction;
-use crate::bot::commands::simple::QHelp;
 use crate::bot::commands::QbCommandAction;
+use crate::bot::commands::simple::QHelp;
 use crate::bot::notifier::CheckType;
 use crate::bot::qb_chat::MenuValue::*;
 use crate::bot::qb_client::QbClient;
@@ -21,7 +22,6 @@ use crate::bot::qbot::MessageWrapper;
 
 use super::commands::download::QDownloadAction;
 use super::notifier::Notifier;
-use crate::bot::commands::aux::get_name_by_id;
 
 #[derive(Clone, Debug, PartialOrd, Ord, Eq, PartialEq)]
 pub enum MenuValue {
@@ -191,7 +191,7 @@ impl QbChat {
                     self.goto(self.menu_pos.value.clone()).await
                 }
             }
-            cmd @ ("/pause" | "/resume") if matches!(self.menu_pos.value, TorrentPage(_)) => {
+            cmd @ ("/pause" | "/resume") if matches!(self.menu_pos.value, TorrentPage(id)) => {
                 let res = if let TorrentPage(id) = self.menu_pos.value {
                     QPauseResumeAction::new(cmd.strip_prefix('/').unwrap())
                         .act(self.qbclient.clone(), id)
