@@ -52,7 +52,7 @@ impl QbClient {
         Client::builder()
             .cookie_store(true)
             .default_headers(headers)
-            .timeout(Duration::from_secs(3))
+            .timeout(Duration::from_secs(10))
             .build()
             .unwrap()
     }
