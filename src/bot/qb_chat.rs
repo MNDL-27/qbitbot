@@ -9,7 +9,6 @@ use rutebot::client::Rutebot;
 use rutebot::requests::SendMessage;
 use tokio::sync::mpsc::Sender;
 
-use crate::bot::commands::aux::get_name_by_id;
 use crate::bot::commands::pause_resume::QPauseResumeAction;
 use crate::bot::commands::simple::QHelp;
 use crate::bot::commands::QbCommandAction;
@@ -169,10 +168,12 @@ impl QbChat {
                 .action_result_to_string(),
             Download => "Send torrent link or attach torrent file".to_string(),
             TorrentPage(id) => {
-                let name = get_name_by_id(&self.qbclient.read().unwrap(), id)
-                    .await
-                    .unwrap_or_else(|| "Failed to get name".to_string());
-                format!("Torrent management: {}", name)
+                let mut qbclient_lock = self.qbclient.write().unwrap();
+                if let Some(record) = qbclient_lock.get_cached_list().await.unwrap().get_record_by_num(id) {
+                    record.to_string()
+                } else {
+                    "There is no torrent with this id".to_string()
+                }
             }
             _ => "You will never see this message".to_string(),
         }

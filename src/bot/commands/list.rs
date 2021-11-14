@@ -104,6 +104,10 @@ impl QListAction {
 
         Ok(updated)
     }
+
+    pub fn get_record_by_num(&self, num: usize) -> Option<QbListRecord> {
+        self.records.iter().find(|&item| item.num == num).cloned()
+    }
 }
 
 #[derive(Debug, Clone)]
