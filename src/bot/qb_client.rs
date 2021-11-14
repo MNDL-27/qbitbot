@@ -104,6 +104,7 @@ impl QbClient {
         if self.cached_list.is_some() {
             let mut cached_list = self.cached_list.to_owned().unwrap();
             cached_list.check_and_update(&self).await?;
+            self.cached_list = Some(cached_list.clone());
             Ok(cached_list)
         } else {
             let cached_list = QListAction::new(&self).await?;

@@ -6,7 +6,7 @@ use std::{
 
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Local};
-use serde_json::Value;
+use serde_json::{Value, json};
 
 use crate::bot::{commands::cmd_list::QbList, qb_client::QbClient};
 
@@ -44,8 +44,13 @@ impl QListAction {
     }
 
     pub async fn check_and_update(&mut self, client: &QbClient) -> Result<()> {
-        self.check_has_changes(client).await?;
-        self.records = Self::update_records(client).await?;
+        match self.check_has_changes(client).await {
+            Err(_) | Ok(true) => {
+                debug!("Need to update cached list");
+                self.records = Self::update_records(client).await?
+            }
+            Ok(false) => (),
+        };
         Ok(())
     }
 
@@ -63,8 +68,7 @@ impl QListAction {
         }
     }
 
-    // TODO: fix function to differentiate "Error" because Qb failed and "Torrent has not been changed"
-    async fn check_has_changes(&mut self, client: &QbClient) -> Result<Value> {
+    async fn check_has_changes(&mut self, client: &QbClient) -> Result<bool> {
         let resp: Value = client
             .qpost("/sync/maindata", self.maindata_response.to_owned())
             .await?
@@ -74,18 +78,21 @@ impl QListAction {
         self.maindata_response.rid = (|| -> Option<i64> {
             let res = resp.as_object()?.get("rid")?.as_i64()?;
             Some(res)
-        })().ok_or_else(|| anyhow!("Failed to parse Qbittorrent response"))?;
+        })()
+        .ok_or_else(|| anyhow!("Failed to parse Qbittorrent response"))?;
 
-        (|| -> Option<()> {
-            let updated = resp.as_object()?.get("full_update")?.as_bool()?;
-            if !updated {
-                Some(())
-            } else {
-                None
-            }
-        })().ok_or_else(|| anyhow!("Failed to parse Qbittorrent response"))?;
+        let updated = (|| -> Option<bool> {
+            let updated = resp
+                .as_object()?
+                .get("full_update")
+                .unwrap_or(&json!("false"))
+                .as_bool()
+                .unwrap_or(false);
+            Some(updated)
+        })()
+        .ok_or_else(|| anyhow!("Failed to parse Qbittorrent response"))?;
 
-        Ok(resp)
+        Ok(updated)
     }
 }
 
