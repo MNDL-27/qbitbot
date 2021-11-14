@@ -1,6 +1,4 @@
 use std::collections::HashSet;
-use std::ops::Deref;
-use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
 use fure::backoff::fixed;

@@ -1,6 +1,4 @@
-use std::cell::RefCell;
 use std::collections::HashMap;
-use std::ops::Deref;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
@@ -12,7 +10,6 @@ use rutebot::requests::SendMessage;
 use tokio::sync::mpsc::Sender;
 
 use crate::bot::commands::aux::get_name_by_id;
-use crate::bot::commands::list::QListAction;
 use crate::bot::commands::pause_resume::QPauseResumeAction;
 use crate::bot::commands::simple::QHelp;
 use crate::bot::commands::QbCommandAction;
