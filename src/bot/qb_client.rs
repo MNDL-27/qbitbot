@@ -109,13 +109,4 @@ impl QbClient {
             Ok(cached_list)
         }
     }
-    // TODO: move this to appropriate module
-    // pub async fn get_properties(&self, hash: String) -> Result<Value> {
-    //     let value = self
-    //         .qpost("/torrents/properties", QGetProperties { hash })
-    //         .await?
-    //         .json()
-    //         .await?;
-    //     Ok(value)
-    // }
 }
