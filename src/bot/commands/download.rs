@@ -92,7 +92,7 @@ impl QDownloadAction {
     }
 
     async fn check_is_completed(client: &QbClient, hash: &str, name: &str) -> Result<String> {
-        let res = if let Ok(props) = client.get_properties(hash.to_string()).await {
+        let res = if let Ok(props) = QListAction::get_properties(client,hash.to_string()).await {
             let completion_date_opt = move || -> Option<i64> {
                 let obj = props.as_object()?;
                 obj.get("completion_date")?.as_i64()

@@ -6,9 +6,6 @@ use reqwest::{
     header::{HeaderMap, ORIGIN}, Response,
 };
 use serde::Serialize;
-use serde_json::Value;
-
-use crate::bot::commands::cmd_list::QGetProperties;
 
 use super::{
     commands::{
@@ -113,12 +110,12 @@ impl QbClient {
         }
     }
     // TODO: move this to appropriate module
-    pub async fn get_properties(&self, hash: String) -> Result<Value> {
-        let value = self
-            .qpost("/torrents/properties", QGetProperties { hash })
-            .await?
-            .json()
-            .await?;
-        Ok(value)
-    }
+    // pub async fn get_properties(&self, hash: String) -> Result<Value> {
+    //     let value = self
+    //         .qpost("/torrents/properties", QGetProperties { hash })
+    //         .await?
+    //         .json()
+    //         .await?;
+    //     Ok(value)
+    // }
 }

@@ -6,9 +6,10 @@ use std::{
 
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Local};
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 
 use crate::bot::{commands::cmd_list::QbList, qb_client::QbClient};
+use crate::bot::commands::cmd_list::QGetProperties;
 
 use super::{cmd_list::MaindataResponse, QbCommandAction};
 
@@ -41,6 +42,15 @@ impl QListAction {
             .json()
             .await?;
         Ok(resp)
+    }
+
+    pub async fn get_properties(client: &QbClient, hash: String) -> Result<Value> {
+        let value = client
+            .qpost("/torrents/properties", QGetProperties { hash })
+            .await?
+            .json()
+            .await?;
+        Ok(value)
     }
 
     pub async fn check_and_update(&mut self, client: &QbClient) -> Result<()> {
