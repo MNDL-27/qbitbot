@@ -43,7 +43,14 @@ impl QbitBot {
             let chat = lock
                 .entry(chat_id)
                 .or_insert_with(|| QbChat::new(chat_id, self.rbot.clone(), self.qbclient.clone()));
-            chat.select_goto(&text).await;
+            if chat.select_goto(&text).await.is_err() {
+                self.qbclient
+                    .write()
+                    .unwrap()
+                    .login()
+                    .await
+                    .expect("Failed to re-login into Qbittorrent");
+            };
             Some(())
         } else {
             info!(

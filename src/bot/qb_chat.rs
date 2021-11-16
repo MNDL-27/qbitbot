@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
+use anyhow::Result;
 use fure::backoff::fixed;
 use fure::policies::{attempts, backoff};
 use itertools::Itertools;
@@ -10,8 +11,8 @@ use rutebot::requests::SendMessage;
 use tokio::sync::mpsc::Sender;
 
 use crate::bot::commands::pause_resume::QPauseResumeAction;
-use crate::bot::commands::simple::QHelp;
 use crate::bot::commands::QbCommandAction;
+use crate::bot::commands::simple::QHelp;
 use crate::bot::notifier::CheckType;
 use crate::bot::qb_chat::MenuValue::*;
 use crate::bot::qb_client::QbClient;
@@ -154,8 +155,8 @@ impl QbChat {
         chat
     }
 
-    async fn do_cmd(&self) -> String {
-        match self.menu_pos.value {
+    async fn do_cmd(&self) -> Result<String> {
+        let res = match self.menu_pos.value {
             Main => "Main menu".to_string(),
             Help => QHelp {}.action_result_to_string(),
             List => self
@@ -163,34 +164,34 @@ impl QbChat {
                 .write()
                 .unwrap()
                 .get_cached_list()
-                .await
-                .unwrap()
+                .await?
                 .action_result_to_string(),
             Download => "Send torrent link or attach torrent file".to_string(),
             TorrentPage(id) => {
                 let mut qbclient_lock = self.qbclient.write().unwrap();
-                if let Some(record) = qbclient_lock.get_cached_list().await.unwrap().get_record_by_num(id) {
+                if let Some(record) = qbclient_lock.get_cached_list().await?.get_record_by_num(id) {
                     record.to_string()
                 } else {
                     "There is no torrent with this id".to_string()
                 }
             }
             _ => "You will never see this message".to_string(),
-        }
+        };
+        Ok(res)
     }
 
-    pub async fn select_goto(&mut self, text: &str) {
+    pub async fn select_goto(&mut self, text: &str) -> Result<()> {
         match text {
-            "/back" => self.back().await,
+            "/back" => self.back().await?,
             command if self.commands_map.contains_key(command) => {
                 self.goto(self.commands_map.get(command).unwrap().to_owned())
-                    .await
+                    .await?
             }
             _ if text.starts_with("/torrent") => {
                 if let Ok(id) = text.strip_prefix("/torrent").unwrap().parse::<usize>() {
-                    self.goto(TorrentPage(id)).await
+                    self.goto(TorrentPage(id)).await?
                 } else {
-                    self.goto(self.menu_pos.value.clone()).await
+                    self.goto(self.menu_pos.value.clone()).await?
                 }
             }
             cmd @ ("/pause" | "/resume") if matches!(self.menu_pos.value, TorrentPage(_)) => {
@@ -213,8 +214,7 @@ impl QbChat {
                 Download => {
                     let download_obj = QDownloadAction::new()
                         .send_link(&self.qbclient.read().unwrap(), text)
-                        .await
-                        .unwrap();
+                        .await?;
                     download_obj
                         .create_notifier(
                             &self.qbclient.read().unwrap(),
@@ -228,28 +228,31 @@ impl QbChat {
                     };
                     self.send_message(message).await
                 }
-                _ => self.goto(self.menu_pos.value.clone()).await,
+                _ => self.goto(self.menu_pos.value.clone()).await?,
             },
         };
+        Ok(())
     }
 
-    async fn goto(&mut self, menu_value: MenuValue) {
+    async fn goto(&mut self, menu_value: MenuValue) -> Result<()> {
         self.menu_pos = MenuTree::from(menu_value);
-        let content = self.do_cmd().await;
+        let content = self.do_cmd().await?;
         let text = self.menu_pos.show(content).await;
         let message = MessageWrapper {
             text,
             parse_mode: Some(rutebot::requests::ParseMode::Html),
         };
         self.send_message(message).await;
+        Ok(())
     }
 
-    async fn back(&mut self) {
+    async fn back(&mut self) -> Result<()> {
         if self.menu_pos.parent.is_some() {
-            self.goto(self.menu_pos.parent.clone().unwrap()).await;
+            self.goto(self.menu_pos.parent.clone().unwrap()).await?;
         } else {
-            self.goto(self.menu_pos.value.clone()).await
+            self.goto(self.menu_pos.value.clone()).await?
         }
+        Ok(())
     }
 
     pub async fn send_message(&self, message: MessageWrapper) {
