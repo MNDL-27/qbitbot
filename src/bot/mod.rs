@@ -1,9 +1,3 @@
-macro_rules! dotenv_err {
-    () => {
-        "Please provide {} in the .env file"
-    };
-}
-
 pub const TAG_NAME: &str = "qbitbot";
 
 pub mod commands;

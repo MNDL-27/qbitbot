@@ -8,22 +8,17 @@ use futures_util::stream::StreamExt;
 
 use bot::qbot::QbitBot;
 
-mod bot;
+use crate::bot::config::QbConfig;
 
-fn get_loglevel() -> String {
-    match dotenv::var("LOG_LEVEL") {
-        Ok(loglevel) => loglevel,
-        Err(_) => "info".to_string(),
-    }
-}
+mod bot;
 
 #[tokio::main]
 async fn main() {
+    let config = QbConfig::load();
     pretty_env_logger::formatted_builder()
-        .parse_filters(get_loglevel().as_str())
+        .parse_filters(&config.log_level)
         .init();
-    let qbot = QbitBot::new().await;
-    // qbot.create_notify_checker();
+    let qbot = QbitBot::new(&config).await;
     info!("QbitBot launched");
     let mut updates_stream = Box::pin(qbot.rbot.incoming_updates(None, None));
     let qbot_arc = Arc::new(qbot);

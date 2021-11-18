@@ -24,13 +24,12 @@ pub struct QbClient {
 }
 
 impl QbClient {
-    pub async fn new() -> Self {
-        let config = QbConfig::load();
+    pub async fn new(config: &QbConfig) -> Self {
         let headers = Self::gen_headers(config.location.clone());
         let qbclient = QbClient {
             client: Self::build_client(headers),
             cached_list: None,
-            config,
+            config: config.to_owned(),
         };
         qbclient.login().await.unwrap();
         if qbclient.create_tag().await.is_err() {

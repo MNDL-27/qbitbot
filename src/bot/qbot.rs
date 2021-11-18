@@ -5,6 +5,7 @@ use std::{
 
 use rutebot::{client::Rutebot, requests::ParseMode, responses::Update};
 
+use crate::bot::config::QbConfig;
 use crate::bot::qb_chat::QbChat;
 
 use super::qb_client::QbClient;
@@ -22,10 +23,10 @@ pub struct QbitBot {
 }
 
 impl QbitBot {
-    pub async fn new() -> Self {
-        let rbot = Rutebot::new(dotenv::var("TOKEN").expect(&format!(dotenv_err!(), "TOKEN")));
+    pub async fn new(config: &QbConfig) -> Self {
+        let rbot = Rutebot::new(config.token.to_owned());
         QbitBot {
-            qbclient: Arc::new(RwLock::new(QbClient::new().await)),
+            qbclient: Arc::new(RwLock::new(QbClient::new(config).await)),
             rbot,
             chats: Arc::new(RwLock::new(HashMap::new())),
         }
