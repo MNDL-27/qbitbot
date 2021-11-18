@@ -21,7 +21,8 @@ impl QPauseResumeAction {
     ///
     /// Example:
     /// ```
-    /// QPauseResumeAction::new("pause")
+    /// # use qbitbot::bot::commands::pause_resume::QPauseResumeAction;
+    /// QPauseResumeAction::new("pause");
     /// ```
     pub fn new(action: &str) -> Self {
         Self {
