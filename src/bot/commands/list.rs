@@ -8,8 +8,8 @@ use anyhow::{anyhow, Result};
 use chrono::{DateTime, Local};
 use serde_json::{json, Value};
 
-use crate::bot::{commands::cmd_list::QbList, qb_client::QbClient};
 use crate::bot::commands::cmd_list::QGetProperties;
+use crate::bot::{commands::cmd_list::QbList, qb_client::QbClient};
 
 use super::{cmd_list::MaindataResponse, QbCommandAction};
 
@@ -108,6 +108,10 @@ impl QListAction {
     pub fn get_record_by_num(&self, num: usize) -> Option<QbListRecord> {
         self.records.iter().find(|&item| item.num == num).cloned()
     }
+
+    pub fn get_records(&self) -> &Vec<QbListRecord> {
+        &self.records
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -117,6 +121,7 @@ pub struct QbListRecord {
     size: u64,
     progress: u64,
     eta: String,
+    hash: String,
 }
 
 impl QbListRecord {
@@ -155,8 +160,13 @@ impl QbListRecord {
             name: Self::get_name(item)?,
             size: item.get("size")?.as_u64()? / 1048576,
             eta: Self::get_eta(item)?,
+            hash: item.get("hash")?.as_str()?.to_string(),
         };
         Some(record)
+    }
+
+    pub fn get_hash(&self) -> String {
+        self.hash.to_owned()
     }
 }
 

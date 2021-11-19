@@ -197,7 +197,7 @@ impl QbChat {
             cmd @ ("/pause" | "/resume") if matches!(self.menu_pos.value, TorrentPage(_)) => {
                 let res = if let TorrentPage(id) = self.menu_pos.value {
                     QPauseResumeAction::new(cmd.strip_prefix('/').unwrap())
-                        .act(&self.qbclient.read().unwrap(), id)
+                        .act(&mut self.qbclient.write().unwrap(), id)
                         .await
                         .action_result_to_string()
                 } else {
@@ -217,7 +217,7 @@ impl QbChat {
                         .await?;
                     download_obj
                         .create_notifier(
-                            &self.qbclient.read().unwrap(),
+                            &mut self.qbclient.write().unwrap(),
                             self.notifier_tx.clone().unwrap(),
                         )
                         .await;

@@ -99,11 +99,11 @@ impl QbClient {
     pub async fn get_cached_list(&mut self) -> Result<QListAction> {
         if self.cached_list.is_some() {
             let mut cached_list = self.cached_list.to_owned().unwrap();
-            cached_list.check_and_update(&self).await?;
+            cached_list.check_and_update(self).await?;
             self.cached_list = Some(cached_list.clone());
             Ok(cached_list)
         } else {
-            let cached_list = QListAction::new(&self).await?;
+            let cached_list = QListAction::new(self).await?;
             self.cached_list = Some(cached_list.to_owned());
             Ok(cached_list)
         }
@@ -114,10 +114,6 @@ impl QbClient {
 mod tests {
     use super::*;
 
-    fn setup() -> QbConfig {
-        QbConfig::load_path("tests/.env_tests")
-    }
-
     #[derive(Serialize)]
     struct EmptyAction{
         test: i32
@@ -125,7 +121,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_client_start() {
-        let conf = setup();
+        let conf = QbConfig::load_path("tests/.env_tests");
         let client = QbClient::new(&conf).await;
         client.qpost("/app/version", EmptyAction{test: 1}).await.unwrap();
     }

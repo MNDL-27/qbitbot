@@ -5,11 +5,11 @@ use fure::backoff::fixed;
 use fure::policies::{attempts, backoff};
 use reqwest::Response;
 use tokio::sync::mpsc::Sender;
-use tokio::time::{Duration, sleep};
+use tokio::time::{sleep, Duration};
 
-use crate::bot::{qb_client::QbClient, TAG_NAME};
 use crate::bot::notifier::CheckType;
 use crate::bot::notifier::CheckType::Completed;
+use crate::bot::{qb_client::QbClient, TAG_NAME};
 
 use super::{cmd_list::QDownload, list::QListAction, QbCommandAction};
 
@@ -79,20 +79,25 @@ impl QDownloadAction {
         Some(hashes)
     }
 
-    pub async fn get_name(client: &QbClient, hash: &str) -> Option<String> {
-        let list_info = QListAction::get(client).await.ok()?;
-        let name = list_info
-            .as_array()?
+    pub async fn get_name(client: &mut QbClient, hash: &str) -> Option<String> {
+        client
+            .get_cached_list()
+            .await
+            .unwrap()
+            .get_records()
             .iter()
-            .find(|item| item.get("hash").unwrap() == hash)?
-            .as_object()?
-            .get("name")?
-            .to_string();
-        Some(name)
+            .find_map(|item| {
+                let item_hash = item.get_hash();
+                if item.get_hash() == hash {
+                    Some(item_hash)
+                } else {
+                    None
+                }
+            })
     }
 
     async fn check_is_completed(client: &QbClient, hash: &str, name: &str) -> Result<String> {
-        let res = if let Ok(props) = QListAction::get_properties(client,hash.to_string()).await {
+        let res = if let Ok(props) = QListAction::get_properties(client, hash.to_string()).await {
             let completion_date_opt = move || -> Option<i64> {
                 let obj = props.as_object()?;
                 obj.get("completion_date")?.as_i64()
@@ -113,16 +118,19 @@ impl QDownloadAction {
         res
     }
 
-    pub async fn create_notifier(&self, client: &QbClient, tx: Sender<CheckType>) {
+    pub async fn create_notifier(&self, client: &mut QbClient, tx: Sender<CheckType>) {
         let hash = self.torrent_hash.clone();
         if self.status {
-            let res = Self::get_name(&client, &hash).await;
+            let res = Self::get_name(client, &hash).await;
             if let Some(name) = res {
                 let my_client = client.clone();
                 tokio::spawn(async move {
-                    while Self::check_is_completed(&my_client, &hash, &name).await.is_err() {
+                    while Self::check_is_completed(&my_client, &hash, &name)
+                        .await
+                        .is_err()
+                    {
                         sleep(Duration::from_secs(1)).await;
-                    };
+                    }
                     if tx.send(Completed(name)).await.is_err() {
                         error!("Failed to send 'completed' status into channel")
                     }
