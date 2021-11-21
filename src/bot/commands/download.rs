@@ -87,9 +87,8 @@ impl QDownloadAction {
             .get_records()
             .iter()
             .find_map(|item| {
-                let item_hash = item.get_hash();
                 if item.get_hash() == hash {
-                    Some(item_hash)
+                    Some(item.get_name())
                 } else {
                     None
                 }

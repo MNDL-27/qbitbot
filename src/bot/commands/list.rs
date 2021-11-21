@@ -125,7 +125,7 @@ pub struct QbListRecord {
 }
 
 impl QbListRecord {
-    fn get_name(item: &Value) -> Option<String> {
+    fn parse_name(item: &Value) -> Option<String> {
         let name = item
             .get("name")?
             .to_string()
@@ -136,7 +136,7 @@ impl QbListRecord {
         Some(name)
     }
 
-    fn get_eta(item: &Value) -> Option<String> {
+    fn parse_eta(item: &Value) -> Option<String> {
         let eta = item.get("eta")?.as_i64()?;
         let completion_on = item.get("completion_on")?.as_i64()?;
         let humanized_eta = match (eta, completion_on) {
@@ -157,9 +157,9 @@ impl QbListRecord {
         let record = Self {
             num,
             progress: progress as u64,
-            name: Self::get_name(item)?,
+            name: Self::parse_name(item)?,
             size: item.get("size")?.as_u64()? / 1048576,
-            eta: Self::get_eta(item)?,
+            eta: Self::parse_eta(item)?,
             hash: item.get("hash")?.as_str()?.to_string(),
         };
         Some(record)
@@ -167,6 +167,10 @@ impl QbListRecord {
 
     pub fn get_hash(&self) -> String {
         self.hash.to_owned()
+    }
+
+    pub fn get_name(&self) -> String {
+        self.name.to_owned()
     }
 }
 
