@@ -6,7 +6,7 @@ use std::{
 use rutebot::{client::Rutebot, requests::ParseMode, responses::Update};
 
 use crate::bot::config::QbConfig;
-use crate::bot::qb_chat::{QbChat, send_message};
+use crate::bot::qb_chat::{send_message, QbChat};
 
 use super::qb_client::QbClient;
 
@@ -39,17 +39,11 @@ impl QbitBot {
         let username = message.from?.username?;
         let is_admin = self.config.admins.contains(&username);
         if is_admin {
-            let lock = self.chats.read().unwrap();
-            let mut chat = if let Some(chat) = lock.get(&chat_id) {
+            let mut chat = if let Some(chat) = self.chats.read().unwrap().get(&chat_id) {
                 chat.to_owned()
             } else {
-                drop(lock);
-                let mut lock = self.chats.write().unwrap();
                 let qbclient = QbClient::new(&self.config).await;
-                let chat = lock
-                    .entry(chat_id)
-                    .or_insert_with(|| QbChat::new(chat_id, self.rbot.clone(), qbclient));
-                chat.to_owned()
+                QbChat::new(chat_id, self.rbot.clone(), qbclient)
             };
 
             if chat.select_goto(&text).await.is_err() {
@@ -61,6 +55,9 @@ impl QbitBot {
                     error!("There is an error after re-login. Probably something has broken")
                 });
             };
+
+            self.chats.write().unwrap().insert(chat_id, chat);
+
             Some(())
         } else {
             let msg = MessageWrapper {
