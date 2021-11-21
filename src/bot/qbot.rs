@@ -18,15 +18,15 @@ pub struct MessageWrapper {
 
 pub struct QbitBot {
     pub rbot: Rutebot,
-    qbclient: Arc<RwLock<QbClient>>,
+    config: QbConfig,
     chats: Arc<RwLock<HashMap<i64, QbChat>>>,
 }
 
 impl QbitBot {
-    pub async fn new(config: &QbConfig) -> Self {
+    pub async fn new(config: QbConfig) -> Self {
         let rbot = Rutebot::new(config.token.to_owned());
         QbitBot {
-            qbclient: Arc::new(RwLock::new(QbClient::new(config).await)),
+            config,
             rbot,
             chats: Arc::new(RwLock::new(HashMap::new())),
         }
@@ -37,20 +37,22 @@ impl QbitBot {
         let text = message.text?;
         let chat_id = message.chat.id;
         let username = message.from?.username?;
-        // TODO: resolve deadlock
-        // let is_admin = self.qbclient.read().ok()?.config.admins.contains(&username);
-        if true {
+        let is_admin = self.config.admins.contains(&username);
+        if is_admin {
             let mut lock = self.chats.write().unwrap();
+            // TODO: do not create new client every time
+            let qbclient = QbClient::new(&self.config).await;
             let chat = lock
                 .entry(chat_id)
-                .or_insert_with(|| QbChat::new(chat_id, self.rbot.clone(), self.qbclient.clone()));
+                .or_insert_with(|| QbChat::new(chat_id, self.rbot.clone(), qbclient));
             if chat.select_goto(&text).await.is_err() {
-                self.qbclient
-                    .write()
-                    .unwrap()
-                    .login()
+                info!("Qbit token probably expired. Trying to re-login.");
+                chat.relogin()
                     .await
                     .expect("Failed to re-login into Qbittorrent");
+                chat.select_goto(&text).await.unwrap_or_else(|_| {
+                    error!("There is an error after re-login. Probably something has broken")
+                });
             };
             Some(())
         } else {

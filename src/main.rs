@@ -18,7 +18,7 @@ async fn main() {
     pretty_env_logger::formatted_builder()
         .parse_filters(&config.log_level)
         .init();
-    let qbot = QbitBot::new(&config).await;
+    let qbot = QbitBot::new(config).await;
     info!("QbitBot launched");
     let mut updates_stream = Box::pin(qbot.rbot.incoming_updates(None, None));
     let qbot_arc = Arc::new(qbot);

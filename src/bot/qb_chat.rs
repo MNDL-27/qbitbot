@@ -136,13 +136,13 @@ pub struct QbChat {
     chat_id: i64,
     menu_pos: MenuTree,
     rbot: Rutebot,
-    qbclient: Arc<RwLock<QbClient>>,
+    qbclient: QbClient,
     commands_map: HashMap<String, MenuValue>,
     notifier_tx: Option<Sender<CheckType>>,
 }
 
 impl QbChat {
-    pub fn new(chat_id: i64, rbot: Rutebot, qbclient: Arc<RwLock<QbClient>>) -> Self {
+    pub fn new(chat_id: i64, rbot: Rutebot, qbclient: QbClient) -> Self {
         let mut chat = Self {
             chat_id,
             rbot,
@@ -155,21 +155,18 @@ impl QbChat {
         chat
     }
 
-    async fn do_cmd(&self) -> Result<String> {
+    async fn do_cmd(&mut self) -> Result<String> {
         let res = match self.menu_pos.value {
             Main => "Main menu".to_string(),
             Help => QHelp {}.action_result_to_string(),
             List => self
                 .qbclient
-                .write()
-                .unwrap()
                 .get_cached_list()
                 .await?
                 .action_result_to_string(),
             Download => "Send torrent link or attach torrent file".to_string(),
             TorrentPage(id) => {
-                let mut qbclient_lock = self.qbclient.write().unwrap();
-                if let Some(record) = qbclient_lock.get_cached_list().await?.get_record_by_num(id) {
+                if let Some(record) = self.qbclient.get_cached_list().await?.get_record_by_num(id) {
                     record.to_string()
                 } else {
                     "There is no torrent with this id".to_string()
@@ -197,7 +194,7 @@ impl QbChat {
             cmd @ ("/pause" | "/resume") if matches!(self.menu_pos.value, TorrentPage(_)) => {
                 let res = if let TorrentPage(id) = self.menu_pos.value {
                     QPauseResumeAction::new(cmd.strip_prefix('/').unwrap())
-                        .act(&mut self.qbclient.write().unwrap(), id)
+                        .act(&mut self.qbclient, id)
                         .await
                         .action_result_to_string()
                 } else {
@@ -213,11 +210,11 @@ impl QbChat {
             _ => match self.menu_pos.value {
                 Download => {
                     let download_obj = QDownloadAction::new()
-                        .send_link(&self.qbclient.read().unwrap(), text)
+                        .send_link(&self.qbclient, text)
                         .await?;
                     download_obj
                         .create_notifier(
-                            &mut self.qbclient.write().unwrap(),
+                            &mut self.qbclient,
                             self.notifier_tx.clone().unwrap(),
                         )
                         .await;
@@ -253,6 +250,10 @@ impl QbChat {
             self.goto(self.menu_pos.value.clone()).await?
         }
         Ok(())
+    }
+
+    pub async fn relogin(&mut self) -> Result<()> {
+        self.qbclient.login().await
     }
 
     pub async fn send_message(&self, message: MessageWrapper) {
