@@ -6,7 +6,7 @@ use std::{
 use rutebot::{client::Rutebot, requests::ParseMode, responses::Update};
 
 use crate::bot::config::QbConfig;
-use crate::bot::qb_chat::QbChat;
+use crate::bot::qb_chat::{QbChat, send_message};
 
 use super::qb_client::QbClient;
 
@@ -39,12 +39,19 @@ impl QbitBot {
         let username = message.from?.username?;
         let is_admin = self.config.admins.contains(&username);
         if is_admin {
-            let mut lock = self.chats.write().unwrap();
-            // TODO: do not create new client every time
-            let qbclient = QbClient::new(&self.config).await;
-            let chat = lock
-                .entry(chat_id)
-                .or_insert_with(|| QbChat::new(chat_id, self.rbot.clone(), qbclient));
+            let lock = self.chats.read().unwrap();
+            let mut chat = if let Some(chat) = lock.get(&chat_id) {
+                chat.to_owned()
+            } else {
+                drop(lock);
+                let mut lock = self.chats.write().unwrap();
+                let qbclient = QbClient::new(&self.config).await;
+                let chat = lock
+                    .entry(chat_id)
+                    .or_insert_with(|| QbChat::new(chat_id, self.rbot.clone(), qbclient));
+                chat.to_owned()
+            };
+
             if chat.select_goto(&text).await.is_err() {
                 info!("Qbit token probably expired. Trying to re-login.");
                 chat.relogin()
@@ -56,6 +63,11 @@ impl QbitBot {
             };
             Some(())
         } else {
+            let msg = MessageWrapper {
+                text: String::from("You are not allowed to chat with me"),
+                parse_mode: None,
+            };
+            send_message(&self.rbot, chat_id, msg).await;
             info!(
                 "User {} tried to chat with qbot but he does not have access",
                 username

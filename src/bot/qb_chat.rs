@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
 use anyhow::Result;
@@ -205,7 +204,7 @@ impl QbChat {
                     text: res,
                     parse_mode: None,
                 };
-                self.send_message(message).await
+                self.chat_send_message(message).await
             }
             _ => match self.menu_pos.value {
                 Download => {
@@ -223,7 +222,7 @@ impl QbChat {
                         text: res,
                         parse_mode: Some(rutebot::requests::ParseMode::Html),
                     };
-                    self.send_message(message).await
+                    self.chat_send_message(message).await
                 }
                 _ => self.goto(self.menu_pos.value.clone()).await?,
             },
@@ -239,7 +238,7 @@ impl QbChat {
             text,
             parse_mode: Some(rutebot::requests::ParseMode::Html),
         };
-        self.send_message(message).await;
+        self.chat_send_message(message).await;
         Ok(())
     }
 
@@ -256,20 +255,24 @@ impl QbChat {
         self.qbclient.login().await
     }
 
-    pub async fn send_message(&self, message: MessageWrapper) {
-        debug!("Sending message: {:#?}", message);
-        let send_msg = || async {
-            let reply = SendMessage {
-                parse_mode: message.parse_mode,
-                ..SendMessage::new(self.chat_id, &message.text)
-            };
-            self.rbot.clone().prepare_api_request(reply).send().await
-        };
-        let policy = attempts(backoff(fixed(Duration::from_secs(3))), 3);
-        if fure::retry(send_msg, policy).await.is_err() {
-            error!("Failed to send reply 4 times")
-        };
+    pub async fn chat_send_message(&self, message: MessageWrapper) {
+        send_message(&self.rbot, self.chat_id, message).await
     }
+}
+
+pub async fn send_message(rbot: &Rutebot, chat_id: i64, message: MessageWrapper) {
+    debug!("Sending message to chat({}): {:#?}", chat_id, message);
+    let send_msg = || async {
+        let reply = SendMessage {
+            parse_mode: message.parse_mode,
+            ..SendMessage::new(chat_id, &message.text)
+        };
+        rbot.clone().prepare_api_request(reply).send().await
+    };
+    let policy = attempts(backoff(fixed(Duration::from_secs(3))), 3);
+    if fure::retry(send_msg, policy).await.is_err() {
+        error!("Failed to send reply 4 times")
+    };
 }
 
 impl Notifier for QbChat {}

@@ -26,7 +26,7 @@ pub trait Notifier {
                     text: send_text,
                     parse_mode: None,
                 };
-                chat.send_message(message).await
+                chat.chat_send_message(message).await
             }
         });
     }
