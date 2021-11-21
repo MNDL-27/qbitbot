@@ -134,7 +134,7 @@ impl MenuTree {
 pub struct QbChat {
     chat_id: i64,
     menu_pos: MenuTree,
-    rbot: Rutebot,
+    rbot: Option<Rutebot>,
     qbclient: QbClient,
     commands_map: HashMap<String, MenuValue>,
     notifier_tx: Option<Sender<CheckType>>,
@@ -144,8 +144,8 @@ impl QbChat {
     pub fn new(chat_id: i64, rbot: Rutebot, qbclient: QbClient) -> Self {
         let mut chat = Self {
             chat_id,
-            rbot,
             qbclient,
+            rbot: Some(rbot),
             menu_pos: MenuTree::from(Main),
             commands_map: MenuValue::generate_cmds(),
             notifier_tx: None,
@@ -211,12 +211,11 @@ impl QbChat {
                     let download_obj = QDownloadAction::new()
                         .send_link(&self.qbclient, text)
                         .await?;
-                    download_obj
-                        .create_notifier(
-                            &mut self.qbclient,
-                            self.notifier_tx.clone().unwrap(),
-                        )
-                        .await;
+                    if let Some(tx) = self.notifier_tx.clone() {
+                        download_obj.create_notifier(&mut self.qbclient, tx).await;
+                    } else {
+                        error!("Notifier for chat {} is not initialized", self.chat_id)
+                    }
                     let res = download_obj.action_result_to_string();
                     let message = MessageWrapper {
                         text: res,
@@ -256,7 +255,9 @@ impl QbChat {
     }
 
     pub async fn chat_send_message(&self, message: MessageWrapper) {
-        send_message(&self.rbot, self.chat_id, message).await
+        if let Some(rbot) = &self.rbot {
+            send_message(rbot, self.chat_id, message).await
+        }
     }
 }
 
@@ -276,3 +277,89 @@ pub async fn send_message(rbot: &Rutebot, chat_id: i64, message: MessageWrapper)
 }
 
 impl Notifier for QbChat {}
+
+#[cfg(test)]
+mod tests {
+    use crate::bot::config::QbConfig;
+
+    use super::*;
+
+    impl QbChat {
+        pub fn new_mock(qbclient: QbClient) -> Self {
+            Self {
+                qbclient,
+                chat_id: -1,
+                rbot: None,
+                menu_pos: MenuTree::from(Main),
+                commands_map: MenuValue::generate_cmds(),
+                notifier_tx: None,
+            }
+        }
+
+        pub async fn check_goto(&mut self, text: &str) {
+            self.select_goto(text).await.unwrap_or_else(|_| {
+                panic!(
+                    r#"Failed to go to "{}" from {}"#,
+                    text,
+                    self.menu_pos.value.get_command()
+                )
+            })
+        }
+    }
+
+    async fn create_qbchat() -> QbChat {
+        let conf = QbConfig::load_path("tests/.env_tests");
+        let qbclient = QbClient::new(&conf).await;
+        QbChat::new_mock(qbclient)
+    }
+
+    #[tokio::test]
+    async fn test_menu_walk() {
+        let mut chat = create_qbchat().await;
+        assert_eq!(chat.menu_pos.value, Main);
+        chat.check_goto("/help").await;
+        assert_eq!(chat.menu_pos.value, Help);
+        chat.check_goto("qwer").await;
+        assert_eq!(chat.menu_pos.value, Help);
+        chat.check_goto("/list").await;
+        assert_eq!(chat.menu_pos.value, List);
+        chat.check_goto("qwer").await;
+        assert_eq!(chat.menu_pos.value, List);
+        chat.check_goto("/back").await;
+        assert_eq!(chat.menu_pos.value, Main);
+    }
+
+    #[tokio::test]
+    async fn test_download() {
+        let mut chat = create_qbchat().await;
+        chat.check_goto("/download").await;
+        assert_eq!(chat.menu_pos.value, Download);
+        let magnet_link = "magnet:?xt=urn:btih:60A2A94625373B5ACAE66D4C693AE5F3417690C1&tr=http%3A%2F%2Fbt3.t-ru.org%2Fann%3Fmagnet&dn=Peter%20Bruce%2C%20Andrew%20Bruce%2C%20Peter%20Gedeck%20%2F%20Питер%20Брюс%2C%20Эндрю%20Брюс%2C%20Питер%20Гедек%20-%20Practical%20Statistics%20for%20Data%20Scientists%20%2F%20Практическая%20статистика%20для";
+        chat.check_goto(magnet_link).await;
+        assert_eq!(chat.menu_pos.value, Download);
+        chat.check_goto("qwerty").await;
+        assert_eq!(chat.menu_pos.value, Download);
+    }
+
+    #[tokio::test]
+    async fn test_torrent_page() {
+        let mut chat = create_qbchat().await;
+        chat.check_goto("/download").await;
+        assert_eq!(chat.menu_pos.value, Download);
+        let magnet_link = "magnet:?xt=urn:btih:60A2A94625373B5ACAE66D4C693AE5F3417690C1&tr=http%3A%2F%2Fbt3.t-ru.org%2Fann%3Fmagnet&dn=Peter%20Bruce%2C%20Andrew%20Bruce%2C%20Peter%20Gedeck%20%2F%20Питер%20Брюс%2C%20Эндрю%20Брюс%2C%20Питер%20Гедек%20-%20Practical%20Statistics%20for%20Data%20Scientists%20%2F%20Практическая%20статистика%20для";
+        chat.check_goto(magnet_link).await;
+        assert_eq!(chat.menu_pos.value, Download);
+        chat.check_goto("/torrent0").await;
+        assert_eq!(chat.menu_pos.value, TorrentPage(0));
+        chat.check_goto("/pause").await;
+        assert_eq!(chat.menu_pos.value, TorrentPage(0));
+        chat.check_goto("/resume").await;
+        assert_eq!(chat.menu_pos.value, TorrentPage(0));
+        chat.check_goto("qwer").await;
+        assert_eq!(chat.menu_pos.value, TorrentPage(0));
+        chat.check_goto("/back").await;
+        assert_eq!(chat.menu_pos.value, List);
+        chat.check_goto("/back").await;
+        assert_eq!(chat.menu_pos.value, Main);
+    }
+}
