@@ -1,6 +1,9 @@
-use tokio::sync::mpsc::{channel, Receiver, Sender};
+use tokio::sync::oneshot;
+use tokio::sync::oneshot::Sender;
 
-use super::{qb_chat::QbChat, qbot::MessageWrapper};
+use crate::bot::messages::TelegramBackend;
+
+use super::qbot::MessageWrapper;
 
 pub enum CheckType {
     /// Completed(name) check that torrent named 'name' is completed
@@ -8,15 +11,10 @@ pub enum CheckType {
 }
 
 pub trait Notifier {
-    fn get_tx(chat: QbChat) -> Sender<CheckType> {
-        let (tx, rx) = channel(8);
-        Self::create_notify_loop(rx, chat);
-        tx
-    }
-
-    fn create_notify_loop(mut rx: Receiver<CheckType>, chat: QbChat) {
+    fn create_notifier_tx(rbot: impl TelegramBackend, chat_id: i64) -> Sender<CheckType> {
+        let (tx, rx) = oneshot::channel();
         tokio::spawn(async move {
-            while let Some(check) = rx.recv().await {
+            if let Ok(check) = rx.await {
                 let send_text = match check {
                     CheckType::Completed(name) => {
                         format!("{} is done", name)
@@ -26,8 +24,9 @@ pub trait Notifier {
                     text: send_text,
                     parse_mode: None,
                 };
-                chat.chat_send_message(message).await
+                rbot.inner_send_message(chat_id, message).await;
             }
         });
+        tx
     }
 }

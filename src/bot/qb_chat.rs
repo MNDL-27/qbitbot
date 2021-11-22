@@ -1,18 +1,12 @@
 use std::collections::HashMap;
-use std::time::Duration;
 
 use anyhow::Result;
-use fure::backoff::fixed;
-use fure::policies::{attempts, backoff};
 use itertools::Itertools;
-use rutebot::client::Rutebot;
-use rutebot::requests::SendMessage;
-use tokio::sync::mpsc::Sender;
 
 use crate::bot::commands::pause_resume::QPauseResumeAction;
-use crate::bot::commands::QbCommandAction;
 use crate::bot::commands::simple::QHelp;
-use crate::bot::notifier::CheckType;
+use crate::bot::commands::QbCommandAction;
+use crate::bot::messages::TelegramBackend;
 use crate::bot::qb_chat::MenuValue::*;
 use crate::bot::qb_client::QbClient;
 use crate::bot::qbot::MessageWrapper;
@@ -134,24 +128,18 @@ impl MenuTree {
 pub struct QbChat {
     chat_id: i64,
     menu_pos: MenuTree,
-    rbot: Option<Rutebot>,
     qbclient: QbClient,
     commands_map: HashMap<String, MenuValue>,
-    notifier_tx: Option<Sender<CheckType>>,
 }
 
 impl QbChat {
-    pub fn new(chat_id: i64, rbot: Rutebot, qbclient: QbClient) -> Self {
-        let mut chat = Self {
+    pub fn new(chat_id: i64, qbclient: QbClient) -> Self {
+        Self {
             chat_id,
             qbclient,
-            rbot: Some(rbot),
             menu_pos: MenuTree::from(Main),
             commands_map: MenuValue::generate_cmds(),
-            notifier_tx: None,
-        };
-        chat.notifier_tx = Some(Self::get_tx(chat.clone()));
-        chat
+        }
     }
 
     async fn do_cmd(&mut self) -> Result<String> {
@@ -176,18 +164,18 @@ impl QbChat {
         Ok(res)
     }
 
-    pub async fn select_goto(&mut self, text: &str) -> Result<()> {
+    pub async fn select_goto(&mut self, rbot: impl TelegramBackend, text: &str) -> Result<()> {
         match text {
-            "/back" => self.back().await?,
+            "/back" => self.back(rbot).await?,
             command if self.commands_map.contains_key(command) => {
-                self.goto(self.commands_map.get(command).unwrap().to_owned())
+                self.goto(rbot, self.commands_map.get(command).unwrap().to_owned())
                     .await?
             }
             _ if text.starts_with("/torrent") => {
                 if let Ok(id) = text.strip_prefix("/torrent").unwrap().parse::<usize>() {
-                    self.goto(TorrentPage(id)).await?
+                    self.goto(rbot, TorrentPage(id)).await?
                 } else {
-                    self.goto(self.menu_pos.value.clone()).await?
+                    self.goto(rbot, self.menu_pos.value.clone()).await?
                 }
             }
             cmd @ ("/pause" | "/resume") if matches!(self.menu_pos.value, TorrentPage(_)) => {
@@ -204,32 +192,29 @@ impl QbChat {
                     text: res,
                     parse_mode: None,
                 };
-                self.chat_send_message(message).await
+                rbot.inner_send_message(self.chat_id, message).await
             }
             _ => match self.menu_pos.value {
                 Download => {
                     let download_obj = QDownloadAction::new()
                         .send_link(&self.qbclient, text)
                         .await?;
-                    if let Some(tx) = self.notifier_tx.clone() {
-                        download_obj.create_notifier(&mut self.qbclient, tx).await;
-                    } else {
-                        error!("Notifier for chat {} is not initialized", self.chat_id)
-                    }
+                    let tx = Self::create_notifier_tx(rbot.to_owned(), self.chat_id);
+                    download_obj.create_notifier(&mut self.qbclient, tx).await;
                     let res = download_obj.action_result_to_string();
                     let message = MessageWrapper {
                         text: res,
                         parse_mode: Some(rutebot::requests::ParseMode::Html),
                     };
-                    self.chat_send_message(message).await
+                    rbot.inner_send_message(self.chat_id, message).await
                 }
-                _ => self.goto(self.menu_pos.value.clone()).await?,
+                _ => self.goto(rbot, self.menu_pos.value.clone()).await?,
             },
         };
         Ok(())
     }
 
-    async fn goto(&mut self, menu_value: MenuValue) -> Result<()> {
+    async fn goto(&mut self, rbot: impl TelegramBackend, menu_value: MenuValue) -> Result<()> {
         self.menu_pos = MenuTree::from(menu_value);
         let content = self.do_cmd().await?;
         let text = self.menu_pos.show(content).await;
@@ -237,15 +222,16 @@ impl QbChat {
             text,
             parse_mode: Some(rutebot::requests::ParseMode::Html),
         };
-        self.chat_send_message(message).await;
+        rbot.inner_send_message(self.chat_id, message).await;
         Ok(())
     }
 
-    async fn back(&mut self) -> Result<()> {
+    async fn back(&mut self, rbot: impl TelegramBackend) -> Result<()> {
         if self.menu_pos.parent.is_some() {
-            self.goto(self.menu_pos.parent.clone().unwrap()).await?;
+            self.goto(rbot, self.menu_pos.parent.clone().unwrap())
+                .await?;
         } else {
-            self.goto(self.menu_pos.value.clone()).await?
+            self.goto(rbot, self.menu_pos.value.clone()).await?
         }
         Ok(())
     }
@@ -253,27 +239,6 @@ impl QbChat {
     pub async fn relogin(&mut self) -> Result<()> {
         self.qbclient.login().await
     }
-
-    pub async fn chat_send_message(&self, message: MessageWrapper) {
-        if let Some(rbot) = &self.rbot {
-            send_message(rbot, self.chat_id, message).await
-        }
-    }
-}
-
-pub async fn send_message(rbot: &Rutebot, chat_id: i64, message: MessageWrapper) {
-    debug!("Sending message to chat({}): {:#?}", chat_id, message);
-    let send_msg = || async {
-        let reply = SendMessage {
-            parse_mode: message.parse_mode,
-            ..SendMessage::new(chat_id, &message.text)
-        };
-        rbot.clone().prepare_api_request(reply).send().await
-    };
-    let policy = attempts(backoff(fixed(Duration::from_secs(3))), 3);
-    if fure::retry(send_msg, policy).await.is_err() {
-        error!("Failed to send reply 4 times")
-    };
 }
 
 impl Notifier for QbChat {}
@@ -281,6 +246,7 @@ impl Notifier for QbChat {}
 #[cfg(test)]
 mod tests {
     use crate::bot::config::QbConfig;
+    use crate::bot::rutebot_mock::RutebotMock;
 
     use super::*;
 
@@ -289,15 +255,13 @@ mod tests {
             Self {
                 qbclient,
                 chat_id: -1,
-                rbot: None,
                 menu_pos: MenuTree::from(Main),
                 commands_map: MenuValue::generate_cmds(),
-                notifier_tx: None,
             }
         }
 
-        pub async fn check_goto(&mut self, text: &str) {
-            self.select_goto(text).await.unwrap_or_else(|_| {
+        pub async fn check_goto(&mut self, mock_rbot: impl TelegramBackend, text: &str) {
+            self.select_goto(mock_rbot, text).await.unwrap_or_else(|_| {
                 panic!(
                     r#"Failed to go to "{}" from {}"#,
                     text,
@@ -316,50 +280,53 @@ mod tests {
     #[tokio::test]
     async fn test_menu_walk() {
         let mut chat = create_qbchat().await;
+        let tg_mock = RutebotMock {};
         assert_eq!(chat.menu_pos.value, Main);
-        chat.check_goto("/help").await;
+        chat.check_goto(tg_mock.clone(), "/help").await;
         assert_eq!(chat.menu_pos.value, Help);
-        chat.check_goto("qwer").await;
+        chat.check_goto(tg_mock.clone(), "qwer").await;
         assert_eq!(chat.menu_pos.value, Help);
-        chat.check_goto("/list").await;
+        chat.check_goto(tg_mock.clone(), "/list").await;
         assert_eq!(chat.menu_pos.value, List);
-        chat.check_goto("qwer").await;
+        chat.check_goto(tg_mock.clone(), "qwer").await;
         assert_eq!(chat.menu_pos.value, List);
-        chat.check_goto("/back").await;
+        chat.check_goto(tg_mock.clone(), "/back").await;
         assert_eq!(chat.menu_pos.value, Main);
     }
 
     #[tokio::test]
     async fn test_download() {
         let mut chat = create_qbchat().await;
-        chat.check_goto("/download").await;
+        let tg_mock = RutebotMock {};
+        chat.check_goto(tg_mock.clone(), "/download").await;
         assert_eq!(chat.menu_pos.value, Download);
         let magnet_link = "magnet:?xt=urn:btih:60A2A94625373B5ACAE66D4C693AE5F3417690C1&tr=http%3A%2F%2Fbt3.t-ru.org%2Fann%3Fmagnet&dn=Peter%20Bruce%2C%20Andrew%20Bruce%2C%20Peter%20Gedeck%20%2F%20Питер%20Брюс%2C%20Эндрю%20Брюс%2C%20Питер%20Гедек%20-%20Practical%20Statistics%20for%20Data%20Scientists%20%2F%20Практическая%20статистика%20для";
-        chat.check_goto(magnet_link).await;
+        chat.check_goto(tg_mock.clone(), magnet_link).await;
         assert_eq!(chat.menu_pos.value, Download);
-        chat.check_goto("qwerty").await;
+        chat.check_goto(tg_mock.clone(), "qwerty").await;
         assert_eq!(chat.menu_pos.value, Download);
     }
 
     #[tokio::test]
     async fn test_torrent_page() {
         let mut chat = create_qbchat().await;
-        chat.check_goto("/download").await;
+        let tg_mock = RutebotMock {};
+        chat.check_goto(tg_mock.clone(), "/download").await;
         assert_eq!(chat.menu_pos.value, Download);
         let magnet_link = "magnet:?xt=urn:btih:60A2A94625373B5ACAE66D4C693AE5F3417690C1&tr=http%3A%2F%2Fbt3.t-ru.org%2Fann%3Fmagnet&dn=Peter%20Bruce%2C%20Andrew%20Bruce%2C%20Peter%20Gedeck%20%2F%20Питер%20Брюс%2C%20Эндрю%20Брюс%2C%20Питер%20Гедек%20-%20Practical%20Statistics%20for%20Data%20Scientists%20%2F%20Практическая%20статистика%20для";
-        chat.check_goto(magnet_link).await;
+        chat.check_goto(tg_mock.clone(), magnet_link).await;
         assert_eq!(chat.menu_pos.value, Download);
-        chat.check_goto("/torrent0").await;
+        chat.check_goto(tg_mock.clone(), "/torrent0").await;
         assert_eq!(chat.menu_pos.value, TorrentPage(0));
-        chat.check_goto("/pause").await;
+        chat.check_goto(tg_mock.clone(), "/pause").await;
         assert_eq!(chat.menu_pos.value, TorrentPage(0));
-        chat.check_goto("/resume").await;
+        chat.check_goto(tg_mock.clone(), "/resume").await;
         assert_eq!(chat.menu_pos.value, TorrentPage(0));
-        chat.check_goto("qwer").await;
+        chat.check_goto(tg_mock.clone(), "qwer").await;
         assert_eq!(chat.menu_pos.value, TorrentPage(0));
-        chat.check_goto("/back").await;
+        chat.check_goto(tg_mock.clone(), "/back").await;
         assert_eq!(chat.menu_pos.value, List);
-        chat.check_goto("/back").await;
+        chat.check_goto(tg_mock.clone(), "/back").await;
         assert_eq!(chat.menu_pos.value, Main);
     }
 }

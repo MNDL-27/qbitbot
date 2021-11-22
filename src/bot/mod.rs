@@ -6,3 +6,5 @@ pub mod qb_client;
 pub mod qbot;
 mod qb_chat;
 mod notifier;
+mod messages;
+mod rutebot_mock;

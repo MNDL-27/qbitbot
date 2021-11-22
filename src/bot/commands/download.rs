@@ -4,7 +4,7 @@ use anyhow::{anyhow, Result};
 use fure::backoff::fixed;
 use fure::policies::{attempts, backoff};
 use reqwest::Response;
-use tokio::sync::mpsc::Sender;
+use tokio::sync::oneshot::Sender;
 use tokio::time::{sleep, Duration};
 
 use crate::bot::notifier::CheckType;
@@ -130,7 +130,7 @@ impl QDownloadAction {
                     {
                         sleep(Duration::from_secs(1)).await;
                     }
-                    if tx.send(Completed(name)).await.is_err() {
+                    if tx.send(Completed(name)).is_err() {
                         error!("Failed to send 'completed' status into channel")
                     }
                 });
