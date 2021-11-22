@@ -6,7 +6,7 @@ use std::{
 use rutebot::{client::Rutebot, requests::ParseMode, responses::Update};
 
 use crate::bot::config::QbConfig;
-use crate::bot::qb_chat::{send_message, QbChat};
+use crate::bot::qb_chat::{QbChat, send_message};
 
 use super::qb_client::QbClient;
 
@@ -17,22 +17,21 @@ pub struct MessageWrapper {
 }
 
 pub struct QbitBot {
-    pub rbot: Rutebot,
+    rbot: Rutebot,
     config: QbConfig,
     chats: Arc<RwLock<HashMap<i64, QbChat>>>,
 }
 
 impl QbitBot {
-    pub async fn new(config: QbConfig) -> Self {
-        let rbot = Rutebot::new(config.token.to_owned());
+    pub async fn new(conf: &QbConfig, rbot: Rutebot) -> Self {
         QbitBot {
-            config,
             rbot,
+            config: conf.to_owned(),
             chats: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
-    pub async fn process_message(self: Arc<Self>, update: Update) -> Option<()> {
+    pub async fn process_message(&self, update: Update) -> Option<()> {
         let message = update.message?;
         let text = message.text?;
         let chat_id = message.chat.id;
