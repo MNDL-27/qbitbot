@@ -3,8 +3,10 @@ use async_trait::async_trait;
 use crate::bot::qbot::MessageWrapper;
 use crate::bot::messages::TelegramBackend;
 
-#[derive(Clone)]
-pub struct RutebotMock {}
+#[derive(Clone, Default)]
+pub struct RutebotMock {
+    messages: Vec<String>
+}
 
 #[async_trait]
 impl TelegramBackend for RutebotMock {

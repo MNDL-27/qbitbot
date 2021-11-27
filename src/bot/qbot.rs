@@ -6,8 +6,8 @@ use std::{
 use rutebot::{client::Rutebot, requests::ParseMode, responses::Update};
 
 use crate::bot::config::QbConfig;
-use crate::bot::qb_chat::QbChat;
 use crate::bot::messages::send_message;
+use crate::bot::qb_chat::QbChat;
 
 use super::qb_client::QbClient;
 
@@ -51,9 +51,11 @@ impl QbitBot {
                 chat.relogin()
                     .await
                     .expect("Failed to re-login into Qbittorrent");
-                chat.select_goto(self.rbot.to_owned(), &text).await.unwrap_or_else(|_| {
-                    error!("There is an error after re-login. Probably something has broken")
-                });
+                chat.select_goto(self.rbot.to_owned(), &text)
+                    .await
+                    .unwrap_or_else(|_| {
+                        error!("There is an error after re-login. Probably something has broken")
+                    });
             };
 
             self.chats.write().unwrap().insert(chat_id, chat);
@@ -72,4 +74,23 @@ impl QbitBot {
             None
         }
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use rutebot::responses::Update;
+
+    fn gen_message(chat_id: i64, username: String, text: String) -> Update {
+        Update {
+            update_id: 0,
+            message: None,
+            edited_message: None,
+            channel_post: None,
+            callback_query: None,
+            edited_channel_post: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn test_not_admin() {}
 }

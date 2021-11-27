@@ -3,16 +3,16 @@ use std::collections::HashMap;
 use anyhow::Result;
 use itertools::Itertools;
 
+use crate::bot::commands::download::QDownloadAction;
 use crate::bot::commands::pause_resume::QPauseResumeAction;
-use crate::bot::commands::simple::QHelp;
 use crate::bot::commands::QbCommandAction;
+use crate::bot::commands::simple::QHelp;
 use crate::bot::messages::TelegramBackend;
+use crate::bot::notifier::Notifier;
 use crate::bot::qb_chat::MenuValue::*;
 use crate::bot::qb_client::QbClient;
 use crate::bot::qbot::MessageWrapper;
-
-use super::commands::download::QDownloadAction;
-use super::notifier::Notifier;
+use crate::bot::config::QbConfig;
 
 #[derive(Clone, Debug, PartialOrd, Ord, Eq, PartialEq)]
 pub enum MenuValue {
@@ -243,44 +243,45 @@ impl QbChat {
 
 impl Notifier for QbChat {}
 
+// For tests
+impl QbChat {
+    pub fn new_mock(qbclient: QbClient) -> Self {
+        Self {
+            qbclient,
+            chat_id: -1,
+            menu_pos: MenuTree::from(Main),
+            commands_map: MenuValue::generate_cmds(),
+        }
+    }
+
+    pub async fn check_goto(&mut self, mock_rbot: impl TelegramBackend, text: &str) {
+        self.select_goto(mock_rbot, text).await.unwrap_or_else(|_| {
+            panic!(
+                r#"Failed to go to "{}" from {}"#,
+                text,
+                self.menu_pos.value.get_command()
+            )
+        })
+    }
+}
+
+pub async fn create_qbchat_mock() -> QbChat {
+    let conf = QbConfig::load_path("tests/.env_tests");
+    let qbclient = QbClient::new(&conf).await;
+    QbChat::new_mock(qbclient)
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::bot::config::QbConfig;
     use crate::bot::rutebot_mock::RutebotMock;
 
     use super::*;
-
-    impl QbChat {
-        pub fn new_mock(qbclient: QbClient) -> Self {
-            Self {
-                qbclient,
-                chat_id: -1,
-                menu_pos: MenuTree::from(Main),
-                commands_map: MenuValue::generate_cmds(),
-            }
-        }
-
-        pub async fn check_goto(&mut self, mock_rbot: impl TelegramBackend, text: &str) {
-            self.select_goto(mock_rbot, text).await.unwrap_or_else(|_| {
-                panic!(
-                    r#"Failed to go to "{}" from {}"#,
-                    text,
-                    self.menu_pos.value.get_command()
-                )
-            })
-        }
-    }
-
-    async fn create_qbchat() -> QbChat {
-        let conf = QbConfig::load_path("tests/.env_tests");
-        let qbclient = QbClient::new(&conf).await;
-        QbChat::new_mock(qbclient)
-    }
+    use crate::bot::qb_chat::create_qbchat_mock;
 
     #[tokio::test]
     async fn test_menu_walk() {
-        let mut chat = create_qbchat().await;
-        let tg_mock = RutebotMock {};
+        let mut chat = create_qbchat_mock().await;
+        let tg_mock = RutebotMock::default();
         assert_eq!(chat.menu_pos.value, Main);
         chat.check_goto(tg_mock.clone(), "/help").await;
         assert_eq!(chat.menu_pos.value, Help);
@@ -296,8 +297,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_download() {
-        let mut chat = create_qbchat().await;
-        let tg_mock = RutebotMock {};
+        let mut chat = create_qbchat_mock().await;
+        let tg_mock = RutebotMock::default();
         chat.check_goto(tg_mock.clone(), "/download").await;
         assert_eq!(chat.menu_pos.value, Download);
         let magnet_link = "magnet:?xt=urn:btih:60A2A94625373B5ACAE66D4C693AE5F3417690C1&tr=http%3A%2F%2Fbt3.t-ru.org%2Fann%3Fmagnet&dn=Peter%20Bruce%2C%20Andrew%20Bruce%2C%20Peter%20Gedeck%20%2F%20Питер%20Брюс%2C%20Эндрю%20Брюс%2C%20Питер%20Гедек%20-%20Practical%20Statistics%20for%20Data%20Scientists%20%2F%20Практическая%20статистика%20для";
@@ -309,8 +310,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_torrent_page() {
-        let mut chat = create_qbchat().await;
-        let tg_mock = RutebotMock {};
+        let mut chat = create_qbchat_mock().await;
+        let tg_mock = RutebotMock::default();
         chat.check_goto(tg_mock.clone(), "/download").await;
         assert_eq!(chat.menu_pos.value, Download);
         let magnet_link = "magnet:?xt=urn:btih:60A2A94625373B5ACAE66D4C693AE5F3417690C1&tr=http%3A%2F%2Fbt3.t-ru.org%2Fann%3Fmagnet&dn=Peter%20Bruce%2C%20Andrew%20Bruce%2C%20Peter%20Gedeck%20%2F%20Питер%20Брюс%2C%20Эндрю%20Брюс%2C%20Питер%20Гедек%20-%20Practical%20Statistics%20for%20Data%20Scientists%20%2F%20Практическая%20статистика%20для";
