@@ -109,20 +109,3 @@ impl QbClient {
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[derive(Serialize)]
-    struct EmptyAction{
-        test: i32
-    }
-
-    #[tokio::test]
-    async fn test_client_start() {
-        let conf = QbConfig::load_path("tests/.env_tests");
-        let client = QbClient::new(&conf).await;
-        client.qpost("/app/version", EmptyAction{test: 1}).await.unwrap();
-    }
-}
