@@ -23,10 +23,6 @@ jobs:
         override: true
         components: rustfmt, clippy
     - uses: Swatinem/rust-cache@v1
-    - name: clippy
-      run: cargo clippy -- -D warnings
-    - name: fmt
-      run: cargo fmt -- --check
     - name: Run tests
       run: cargo test --verbose
       env:
