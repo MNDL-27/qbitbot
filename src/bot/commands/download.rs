@@ -13,19 +13,13 @@ use crate::bot::{qb_client::QbClient, TAG_NAME};
 
 use super::{cmd_list::QDownload, list::QListAction, QbCommandAction};
 
+#[derive(Default)]
 pub struct QDownloadAction {
     status: bool,
     torrent_hash: String,
 }
 
 impl QDownloadAction {
-    pub fn new() -> Self {
-        QDownloadAction {
-            status: false,
-            torrent_hash: "".to_string(),
-        }
-    }
-
     async fn check_added(
         &mut self,
         client: &QbClient,

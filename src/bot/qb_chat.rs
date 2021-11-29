@@ -196,7 +196,7 @@ impl QbChat {
             }
             _ => match self.menu_pos.value {
                 Download => {
-                    let download_obj = QDownloadAction::new()
+                    let download_obj = QDownloadAction::default()
                         .send_link(&self.qbclient, text)
                         .await?;
                     let tx = Self::create_notifier_tx(rbot.clone(), self.chat_id);
