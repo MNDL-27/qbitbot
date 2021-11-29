@@ -16,7 +16,18 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
-    - name: Build
-      run: cargo build --verbose
+    - name: Install latest stable
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        override: true
+        components: rustfmt, clippy
+    - uses: Swatinem/rust-cache@v1
+    - name: clippy
+      run: cargo clippy -- -D warnings
+    - name: fmt
+      run: cargo fmt -- --check
     - name: Run tests
       run: cargo test --verbose
+      env:
+        RUST_BACKTRACE: 1
