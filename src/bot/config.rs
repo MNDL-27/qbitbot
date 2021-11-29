@@ -18,7 +18,7 @@ pub struct QbConfig {
 
 impl QbConfig {
     pub fn load_path(path: &str) -> Self {
-        dotenv::from_filename(path).expect(".env config file was not found!");
+        dotenv::from_filename(path).unwrap_or_else(|_| panic!("{} config file was not found!", path));
         QbConfig {
             location: get_dotenv_var_or_panic!("QBLOCATION"),
             user: get_dotenv_var_or_panic!("QBUSER"),
