@@ -1,5 +1,6 @@
-mod common;
 use common::{TestCase, MAGNET_LINK};
+
+mod common;
 
 #[tokio::test]
 async fn test_download() {

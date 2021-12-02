@@ -1,10 +1,10 @@
-use common::{TestCase, MAGNET_LINK};
-use qbitbot::bot::config::QbConfig;
-use qbitbot::bot::qb_client::QbClient;
-use qbitbot::bot::rutebot_mock::RutebotMock;
-use qbitbot::bot::qb_chat::QbChat;
 use std::sync::Arc;
+
+use common::{MAGNET_LINK, RutebotMock, TestCase};
+use qbitbot::bot::config::QbConfig;
 use qbitbot::bot::qb_chat::MenuValue::*;
+use qbitbot::bot::qb_chat::QbChat;
+use qbitbot::bot::qb_client::QbClient;
 
 mod common;
 

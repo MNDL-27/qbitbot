@@ -1,11 +1,14 @@
+use std::process::Command;
+use std::sync::{Arc, RwLock};
+
+use async_trait::async_trait;
 use rutebot::responses::Update;
+use serde_json::json;
 
 use qbitbot::bot::config::QbConfig;
+use qbitbot::bot::messages::TelegramBackend;
+use qbitbot::bot::qbot::MessageWrapper;
 use qbitbot::bot::qbot::QbitBot;
-use qbitbot::bot::rutebot_mock::RutebotMock;
-use serde_json::json;
-use std::process::Command;
-use std::sync::Arc;
 
 pub const MAGNET_LINK: &str = "magnet:?xt=urn:btih:60A2A94625373B5ACAE66D4C693AE5F3417690C1&tr=http%3A%2F%2Fbt3.t-ru.org%2Fann%3Fmagnet&dn=Peter%20Bruce%2C%20Andrew%20Bruce%2C%20Peter%20Gedeck%20%2F%20Питер%20Брюс%2C%20Эндрю%20Брюс%2C%20Питер%20Гедек%20-%20Practical%20Statistics%20for%20Data%20Scientists%20%2F%20Практическая%20статистика%20для";
 
@@ -71,5 +74,38 @@ impl Drop for TestCase {
             .spawn()
             .expect("Failed to stop Qbittorrent docker");
         handle.wait().unwrap();
+    }
+}
+
+#[derive(Clone, Default)]
+pub struct RutebotMock {
+    inner: Arc<RwLock<InnerRutebotMock>>,
+}
+
+#[derive(Default)]
+struct InnerRutebotMock {
+    messages: Vec<MessageWrapper>,
+}
+
+impl RutebotMock {
+    pub fn assert_last(&self, wants: &str) {
+        assert_eq!(
+            wants,
+            self.inner
+                .read()
+                .unwrap()
+                .messages
+                .iter()
+                .last()
+                .unwrap()
+                .text
+        )
+    }
+}
+
+#[async_trait]
+impl TelegramBackend for RutebotMock {
+    async fn send_message(&self, _: i64, message: MessageWrapper) {
+        self.inner.write().unwrap().messages.push(message);
     }
 }

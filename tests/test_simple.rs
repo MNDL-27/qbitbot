@@ -4,7 +4,7 @@ use common::TestCase;
 use qbitbot::bot::config::QbConfig;
 use qbitbot::bot::qb_client::QbClient;
 
-pub mod common;
+mod common;
 
 #[tokio::test]
 async fn run_simple_tests() {
